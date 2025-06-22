@@ -3,16 +3,24 @@ using Microsoft.Extensions.FileProviders;
 using NotesSolution.Core.Interfaces;
 using NotesSolution.Infrastructure.Data;
 using NotesSolution.Infrastructure.Services;
+using NotesSolution.Core.Interfaces.IRepositories;
+using NotesSolution.Infrastructure.Repositories;
+using FluentValidation;
+using NotesSolution.Core.Dtos;
+using NotesSolution.Core.Validation;
+using AutoMapper;
+using NotesSolution.Core;
+using NotesSolution.API.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-// Добавляем DbContext
+// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Регистрация сервиса изображений
+// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 builder.Services.AddScoped<IImageService>(provider =>
 {
     var config = provider.GetRequiredService<IConfiguration>();
@@ -24,7 +32,16 @@ builder.Services.AddScoped<IImageService>(provider =>
     );
 });
 
-// Регистрируем Swagger
+// Register NoteRepository
+builder.Services.AddScoped<INoteRepository, NoteRepository>();
+builder.Services.AddScoped<ITagRepository, TagRepository>();
+// Register validators
+builder.Services.AddScoped<IValidator<NoteCreateDto>, NoteCreateDtoValidator>();
+builder.Services.AddScoped<IValidator<NoteUpdateDto>, NoteUpdateDtoValidator>();
+// Register AutoMapper
+builder.Services.AddAutoMapper(typeof(MappingConfig));
+
+//  Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -47,6 +64,10 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.UseHttpsRedirection();
 
-// Здесь будут регистрироваться эндпоинты
+// пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+
+// Map NoteEndpoints
+app.MapNoteEndpoints();
+app.MapTagEndpoints();
 
 app.Run();

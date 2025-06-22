@@ -1,0 +1,61 @@
+using NotesSolution.Core.Interfaces.IRepositories;
+using NotesSolution.Core.Models;
+using NotesSolution.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+
+namespace NotesSolution.Infrastructure.Repositories
+{
+    public class NoteRepository : INoteRepository
+    {
+        private readonly AppDbContext _db;
+
+        public NoteRepository(AppDbContext db)
+        {
+            _db = db;
+        }
+
+        public async Task<ICollection<Note>> GetAllAsync(string? search, string? tag, string? sort, string? order, int page, int pageSize)
+        {
+            var query = _db.Notes.Include(n => n.Tags).AsQueryable();
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                query = query.Where(n => n.Name.Contains(search) || n.Description.Contains(search));
+            }
+
+            if (!string.IsNullOrEmpty(tag))
+            {
+                query = query.Where(n => n.Tags.Any(t => t.Name.ToLower() == tag.ToLower()));
+            }
+
+            if (!string.IsNullOrEmpty(sort))
+            {
+                switch (sort.ToLower())
+                {
+                    case "date":
+                        query = order?.ToLower() == "desc" 
+                            ? query.OrderByDescending(n => n.CreationDate) 
+                            : query.OrderBy(n => n.CreationDate);
+                        break;
+                    case "name":
+                        query = order?.ToLower() == "desc" 
+                            ? query.OrderByDescending(n => n.Name) 
+                            : query.OrderBy(n => n.Name);
+                        break;
+                }
+            }
+
+            return await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+        }
+
+        public async Task<Note?> GetAsync(Guid id) => await _db.Notes.Include(n => n.Tags).FirstOrDefaultAsync(n => n.Id == id);
+        public async Task CreateAsync(Note note) { await _db.Notes.AddAsync(note); }
+        public async Task UpdateAsync(Note note) { _db.Notes.Update(note); }
+        public async Task RemoveAsync(Note note) { _db.Notes.Remove(note); await _db.SaveChangesAsync(); }
+        public async Task SaveAsync() => await _db.SaveChangesAsync();
+        public async Task<bool> ExistsAsync(Guid id) => await _db.Notes.AnyAsync(n => n.Id == id);
+    }
+} 
