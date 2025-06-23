@@ -8,6 +8,9 @@ using System.Net;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Http;
 using NotesSolution.Core.Interfaces;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using System.Security.Claims;
 
 namespace NotesSolution.API.Endpoints
 {
@@ -17,30 +20,49 @@ namespace NotesSolution.API.Endpoints
         {
             var group = app.MapGroup("/api/notes").WithTags("Notes");
 
-            group.MapGet("/", GetAllNotes).WithName("GetAllNotes").Produces<List<NoteDto>>(200);
-            group.MapGet("/{id}", GetNoteById).WithName("GetNoteById").Produces<NoteDto>(200).Produces(404);
-            group.MapPost("/", CreateNote).WithName("CreateNote").Accepts<NoteCreateDto>("multipart/form-data").Produces<NoteDto>(201).Produces(400);
-            group.MapPut("/{id}", UpdateNote).WithName("UpdateNote").Accepts<NoteUpdateDto>("multipart/form-data").Produces<NoteDto>(200).Produces(400).Produces(404);
-            group.MapDelete("/{id}", DeleteNote).WithName("DeleteNote").Produces(204).Produces(404);
+            group.MapGet("/", GetAllNotes).WithName("GetAllNotes")
+                .Produces<List<NoteDto>>(200).RequireAuthorization();
+            group.MapGet("/{id}", GetNoteById).WithName("GetNoteById")
+                .Produces<NoteDto>(200).Produces(404).RequireAuthorization();
+
+            group.MapPost("/", CreateNote).WithName("CreateNote")
+                .Accepts<NoteCreateDto>("multipart/form-data").Produces<NoteDto>(201).Produces(400).RequireAuthorization();
+
+            group.MapPut("/{id}", UpdateNote).WithName("UpdateNote")
+                .Accepts<NoteUpdateDto>("multipart/form-data").Produces<NoteDto>(200).Produces(400).Produces(404).RequireAuthorization();
+
+            group.MapDelete("/{id}", DeleteNote).WithName("DeleteNote")
+                .Produces(204).Produces(404).RequireAuthorization();
         }
 
-        private static async Task<IResult> GetAllNotes(INoteRepository noteRepository, IMapper mapper, ILogger<Program> logger,
+        private static async Task<IResult> GetAllNotes(
+            INoteRepository noteRepository,
+            IMapper mapper,
+            ILogger<Program> logger,
+            [FromServices] IHttpContextAccessor httpContextAccessor,
             [FromQuery] string? search, [FromQuery] string? tag, [FromQuery] string? sort, [FromQuery] string? order,
             [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
+            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
             logger.LogInformation("Getting all notes with parameters: search={Search}, tag={Tag}, sort={Sort}, order={Order}, page={Page}, pageSize={PageSize}", search, tag, sort, order, page, pageSize);
             var notes = await noteRepository.GetAllAsync(search, tag, sort, order, page, pageSize);
+            notes = notes.Where(n => n.UserId == userId).ToList();
             var noteDtos = mapper.Map<List<NoteDto>>(notes);
             return Results.Ok(noteDtos);
         }
 
-        private static async Task<IResult> GetNoteById(Guid id, INoteRepository noteRepository, IMapper mapper, ILogger<Program> logger)
+        private static async Task<IResult> GetNoteById(
+            Guid id,
+            INoteRepository noteRepository,
+            IMapper mapper, ILogger<Program> logger,
+            [FromServices] IHttpContextAccessor httpContextAccessor)
         {
+            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
             logger.LogInformation($"Getting note with id = {id}");
             var note = await noteRepository.GetAsync(id);
-            if (note == null)
+            if (note == null || note.UserId != userId)
             {
-                logger.LogWarning($"Note with id {id} not found");
+                logger.LogWarning($"Note with id {id} not found or not owned by user");
                 return Results.NotFound();
             }
             var noteDto = mapper.Map<NoteDto>(note);
@@ -57,8 +79,10 @@ namespace NotesSolution.API.Endpoints
             IImageService imageService,
             IMapper mapper,
             IValidator<NoteCreateDto> validator,
-            ILogger<Program> logger)
+            ILogger<Program> logger,
+            [FromServices] IHttpContextAccessor httpContextAccessor)
         {
+            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
             logger.LogInformation("Attempting to create new note");
             var noteDto = new NoteCreateDto
             {
@@ -74,6 +98,7 @@ namespace NotesSolution.API.Endpoints
                 return Results.BadRequest(validationResult.Errors);
             }
             var note = mapper.Map<Note>(noteDto);
+            note.UserId = userId;
             var tagEntities = new List<Tag>();
             foreach (var tagName in noteDto.Tags)
             {
@@ -84,7 +109,7 @@ namespace NotesSolution.API.Endpoints
                 }
                 else
                 {
-                    var newTag = new Tag { Name = tagName };
+                    var newTag = new Tag { Name = tagName, UserId = userId };
                     await tagRepository.CreateAsync(newTag);
                     tagEntities.Add(newTag);
                 }
@@ -118,8 +143,10 @@ namespace NotesSolution.API.Endpoints
             IImageService imageService,
             IMapper mapper,
             IValidator<NoteUpdateDto> validator,
-            ILogger<Program> logger)
+            ILogger<Program> logger,
+            [FromServices] IHttpContextAccessor httpContextAccessor)
         {
+            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
             logger.LogInformation($"Updating note with id {id}");
             var noteDto = new NoteUpdateDto
             {
@@ -135,9 +162,9 @@ namespace NotesSolution.API.Endpoints
                 return Results.BadRequest(validationResult.Errors);
             }
             var existingNote = await noteRepository.GetAsync(id);
-            if (existingNote == null)
+            if (existingNote == null || existingNote.UserId != userId)
             {
-                logger.LogWarning($"Note with id {id} not found");
+                logger.LogWarning($"Note with id {id} not found or not owned by user");
                 return Results.NotFound();
             }
             var tagEntities = new List<Tag>();
@@ -150,7 +177,7 @@ namespace NotesSolution.API.Endpoints
                 }
                 else
                 {
-                    var newTag = new Tag { Name = tagName };
+                    var newTag = new Tag { Name = tagName, UserId = userId };
                     await tagRepository.CreateAsync(newTag);
                     tagEntities.Add(newTag);
                 }
@@ -173,13 +200,14 @@ namespace NotesSolution.API.Endpoints
             return Results.Ok(updatedNoteDto);
         }
 
-        private static async Task<IResult> DeleteNote(Guid id, INoteRepository noteRepository, ILogger<Program> logger)
+        private static async Task<IResult> DeleteNote(Guid id, INoteRepository noteRepository, ILogger<Program> logger, [FromServices] IHttpContextAccessor httpContextAccessor)
         {
+            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
             logger.LogInformation($"Deleting note with id {id}");
             var existingNote = await noteRepository.GetAsync(id);
-            if (existingNote == null)
+            if (existingNote == null || existingNote.UserId != userId)
             {
-                logger.LogWarning($"Note with id {id} not found");
+                logger.LogWarning($"Note with id {id} not found or not owned by user");
                 return Results.NotFound();
             }
             await noteRepository.RemoveAsync(existingNote);
