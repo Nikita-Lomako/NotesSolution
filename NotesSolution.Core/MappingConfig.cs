@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using AutoMapper;
+using Microsoft.AspNetCore.Identity;
 using NotesSolution.Core.Dtos;
 using NotesSolution.Core.Models;
 
@@ -20,7 +21,9 @@ namespace NotesSolution.Core
             CreateMap<NoteUpdateDto, Note>()
                 .ForMember(dest => dest.Tags, opt => opt.Ignore());
             CreateMap<Tag, TagDto>().ReverseMap();
-            CreateMap<Tag, TagCreateDto>().ReverseMap();
+            CreateMap<IdentityUser, UserDto>()
+                .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id))
+                .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.UserName));
         }
     }
 }

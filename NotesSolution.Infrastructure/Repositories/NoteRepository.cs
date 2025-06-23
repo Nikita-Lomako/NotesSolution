@@ -20,7 +20,7 @@ namespace NotesSolution.Infrastructure.Repositories
 
             if (!string.IsNullOrEmpty(search))
             {
-                query = query.Where(n => n.Name.Contains(search) || n.Description.Contains(search));
+                query = query.Where(n => n.Name.ToLower().Contains(search.ToLower()) || n.Description.ToLower().Contains(search.ToLower()));
             }
 
             if (!string.IsNullOrEmpty(tag))

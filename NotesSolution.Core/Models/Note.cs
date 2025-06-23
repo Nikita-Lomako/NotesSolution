@@ -14,5 +14,6 @@ namespace NotesSolution.Core.Models
         public List<Tag> Tags { get; set; } = new();
         public List<string> ImageUrls { get; set; } = new();
         public DateTime CreationDate { get; set; } = DateTime.UtcNow;
+        public string UserId { get; set; } = string.Empty;
     }
 }

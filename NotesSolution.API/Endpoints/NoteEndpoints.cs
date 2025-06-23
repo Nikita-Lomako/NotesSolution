@@ -6,6 +6,8 @@ using NotesSolution.Core.Interfaces.IRepositories;
 using NotesSolution.Core.Models;
 using System.Net;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http;
+using NotesSolution.Core.Interfaces;
 
 namespace NotesSolution.API.Endpoints
 {
@@ -17,8 +19,8 @@ namespace NotesSolution.API.Endpoints
 
             group.MapGet("/", GetAllNotes).WithName("GetAllNotes").Produces<List<NoteDto>>(200);
             group.MapGet("/{id}", GetNoteById).WithName("GetNoteById").Produces<NoteDto>(200).Produces(404);
-            group.MapPost("/", CreateNote).WithName("CreateNote").Accepts<NoteCreateDto>("application/json").Produces<NoteDto>(201).Produces(400);
-            group.MapPut("/{id}", UpdateNote).WithName("UpdateNote").Accepts<NoteUpdateDto>("application/json").Produces<NoteDto>(200).Produces(400).Produces(404);
+            group.MapPost("/", CreateNote).WithName("CreateNote").Accepts<NoteCreateDto>("multipart/form-data").Produces<NoteDto>(201).Produces(400);
+            group.MapPut("/{id}", UpdateNote).WithName("UpdateNote").Accepts<NoteUpdateDto>("multipart/form-data").Produces<NoteDto>(200).Produces(400).Produces(404);
             group.MapDelete("/{id}", DeleteNote).WithName("DeleteNote").Produces(204).Produces(404);
         }
 
@@ -46,14 +48,25 @@ namespace NotesSolution.API.Endpoints
         }
 
         private static async Task<IResult> CreateNote(
-            NoteCreateDto noteDto,
+            [FromForm] string name,
+            [FromForm] string description,
+            [FromForm] List<string> tags,
+            [FromForm] IFormFileCollection? images,
             INoteRepository noteRepository,
             ITagRepository tagRepository,
+            IImageService imageService,
             IMapper mapper,
             IValidator<NoteCreateDto> validator,
             ILogger<Program> logger)
         {
             logger.LogInformation("Attempting to create new note");
+            var noteDto = new NoteCreateDto
+            {
+                Name = name,
+                Description = description,
+                Tags = tags ?? new List<string>(),
+                ImageUrls = new List<string>()
+            };
             var validationResult = await validator.ValidateAsync(noteDto);
             if (!validationResult.IsValid)
             {
@@ -61,7 +74,6 @@ namespace NotesSolution.API.Endpoints
                 return Results.BadRequest(validationResult.Errors);
             }
             var note = mapper.Map<Note>(noteDto);
-
             var tagEntities = new List<Tag>();
             foreach (var tagName in noteDto.Tags)
             {
@@ -79,10 +91,17 @@ namespace NotesSolution.API.Endpoints
             }
             note.Tags = tagEntities;
             note.CreationDate = DateTime.UtcNow;
-            
+            // Handle image uploads
+            if (images != null && images.Count > 0)
+            {
+                foreach (var image in images)
+                {
+                    var imageUrl = await imageService.SaveImageAsync(image);
+                    note.ImageUrls.Add(imageUrl);
+                }
+            }
             await noteRepository.CreateAsync(note);
             await noteRepository.SaveAsync();
-
             var createdNoteDto = mapper.Map<NoteDto>(note);
             logger.LogInformation($"Created new note with id {note.Id}");
             return Results.Created($"/api/notes/{createdNoteDto.Id}", createdNoteDto);
@@ -90,14 +109,25 @@ namespace NotesSolution.API.Endpoints
 
         private static async Task<IResult> UpdateNote(
             Guid id,
-            NoteUpdateDto noteDto,
+            [FromForm] string name,
+            [FromForm] string description,
+            [FromForm] List<string> tags,
+            [FromForm] IFormFileCollection? images,
             INoteRepository noteRepository,
             ITagRepository tagRepository,
+            IImageService imageService,
             IMapper mapper,
             IValidator<NoteUpdateDto> validator,
             ILogger<Program> logger)
         {
             logger.LogInformation($"Updating note with id {id}");
+            var noteDto = new NoteUpdateDto
+            {
+                Name = name,
+                Description = description,
+                Tags = tags ?? new List<string>(),
+                ImageUrls = new List<string>()
+            };
             var validationResult = await validator.ValidateAsync(noteDto);
             if (!validationResult.IsValid)
             {
@@ -110,7 +140,6 @@ namespace NotesSolution.API.Endpoints
                 logger.LogWarning($"Note with id {id} not found");
                 return Results.NotFound();
             }
-
             var tagEntities = new List<Tag>();
             foreach (var tagName in noteDto.Tags)
             {
@@ -126,13 +155,19 @@ namespace NotesSolution.API.Endpoints
                     tagEntities.Add(newTag);
                 }
             }
-            
             mapper.Map(noteDto, existingNote);
             existingNote.Tags = tagEntities;
-
+            // Handle image uploads
+            if (images != null && images.Count > 0)
+            {
+                foreach (var image in images)
+                {
+                    var imageUrl = await imageService.SaveImageAsync(image);
+                    existingNote.ImageUrls.Add(imageUrl);
+                }
+            }
             await noteRepository.UpdateAsync(existingNote);
             await noteRepository.SaveAsync();
-
             var updatedNoteDto = mapper.Map<NoteDto>(existingNote);
             logger.LogInformation($"Updated note with id {id}");
             return Results.Ok(updatedNoteDto);

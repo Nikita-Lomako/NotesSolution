@@ -8,7 +8,7 @@ namespace NotesSolution.Core.Validation
         public NoteCreateDtoValidator()
         {
             RuleFor(x => x.Name).NotEmpty().MaximumLength(100);
-            RuleFor(x => x.Description).NotEmpty().MaximumLength(1000);
+            RuleFor(x => x.Description).MaximumLength(1000);
             RuleFor(x => x.Tags).NotNull();
             RuleFor(x => x.ImageUrls).NotNull();
         }

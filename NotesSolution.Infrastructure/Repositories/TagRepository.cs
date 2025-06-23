@@ -14,11 +14,6 @@ namespace NotesSolution.Infrastructure.Repositories
             _db = db;
         }
 
-        public async Task CreateAsync(Tag tag)
-        {
-            await _db.Tags.AddAsync(tag);
-        }
-
         public async Task<ICollection<Tag>> GetAllAsync()
         {
             return await _db.Tags.ToListAsync();
@@ -32,6 +27,21 @@ namespace NotesSolution.Infrastructure.Repositories
         public async Task<Tag?> GetByNameAsync(string name)
         {
             return await _db.Tags.FirstOrDefaultAsync(t => t.Name.ToLower() == name.ToLower());
+        }
+
+        public async Task CreateAsync(Tag tag)
+        {
+            await _db.Tags.AddAsync(tag);
+        }
+
+        public async Task UpdateAsync(Tag tag)
+        {
+            _db.Tags.Update(tag);
+        }
+
+        public async Task RemoveAsync(Tag tag)
+        {
+            _db.Tags.Remove(tag);
         }
 
         public async Task SaveAsync()

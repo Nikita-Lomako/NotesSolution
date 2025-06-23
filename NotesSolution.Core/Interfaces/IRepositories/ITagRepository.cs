@@ -9,5 +9,7 @@ namespace NotesSolution.Core.Interfaces.IRepositories
         Task<Tag?> GetByNameAsync(string name);
         Task CreateAsync(Tag tag);
         Task SaveAsync();
+        Task UpdateAsync(Tag tag);
+        Task RemoveAsync(Tag tag);
     }
-} 
+}
