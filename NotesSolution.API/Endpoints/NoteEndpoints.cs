@@ -26,10 +26,12 @@ namespace NotesSolution.API.Endpoints
                 .Produces<NoteDto>(200).Produces(404).RequireAuthorization();
 
             group.MapPost("/", CreateNote).WithName("CreateNote")
-                .Accepts<NoteCreateDto>("multipart/form-data").Produces<NoteDto>(201).Produces(400).RequireAuthorization();
+                .Accepts<NoteCreateDto>("multipart/form-data")
+                .Produces<NoteDto>(201).Produces(400).RequireAuthorization().DisableAntiforgery();
 
             group.MapPut("/{id}", UpdateNote).WithName("UpdateNote")
-                .Accepts<NoteUpdateDto>("multipart/form-data").Produces<NoteDto>(200).Produces(400).Produces(404).RequireAuthorization();
+                .Accepts<NoteUpdateDto>("multipart/form-data")
+                .Produces<NoteDto>(200).Produces(400).Produces(404).RequireAuthorization().DisableAntiforgery();
 
             group.MapDelete("/{id}", DeleteNote).WithName("DeleteNote")
                 .Produces(204).Produces(404).RequireAuthorization();
@@ -69,10 +71,17 @@ namespace NotesSolution.API.Endpoints
             return Results.Ok(noteDto);
         }
 
+        private static List<string> NormalizeTags(string tags)
+        {
+            if (string.IsNullOrWhiteSpace(tags))
+                return new List<string>();
+            return tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        }
+
         private static async Task<IResult> CreateNote(
             [FromForm] string name,
             [FromForm] string description,
-            [FromForm] List<string> tags,
+            [FromForm] string tags,
             [FromForm] IFormFileCollection? images,
             INoteRepository noteRepository,
             ITagRepository tagRepository,
@@ -84,11 +93,12 @@ namespace NotesSolution.API.Endpoints
         {
             var userId = httpContextAccessor.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
             logger.LogInformation("Attempting to create new note");
+            var normalizedTags = NormalizeTags(tags);
             var noteDto = new NoteCreateDto
             {
                 Name = name,
                 Description = description,
-                Tags = tags ?? new List<string>(),
+                Tags = normalizedTags,
                 ImageUrls = new List<string>()
             };
             var validationResult = await validator.ValidateAsync(noteDto);
@@ -136,7 +146,7 @@ namespace NotesSolution.API.Endpoints
             Guid id,
             [FromForm] string name,
             [FromForm] string description,
-            [FromForm] List<string> tags,
+            [FromForm] string tags,
             [FromForm] IFormFileCollection? images,
             INoteRepository noteRepository,
             ITagRepository tagRepository,
@@ -148,11 +158,12 @@ namespace NotesSolution.API.Endpoints
         {
             var userId = httpContextAccessor.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
             logger.LogInformation($"Updating note with id {id}");
+            var normalizedTags = NormalizeTags(tags);
             var noteDto = new NoteUpdateDto
             {
                 Name = name,
                 Description = description,
-                Tags = tags ?? new List<string>(),
+                Tags = normalizedTags,
                 ImageUrls = new List<string>()
             };
             var validationResult = await validator.ValidateAsync(noteDto);
@@ -215,4 +226,4 @@ namespace NotesSolution.API.Endpoints
             return Results.NoContent();
         }
     }
-} 
+}

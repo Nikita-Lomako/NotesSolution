@@ -44,6 +44,7 @@ builder.Services.AddScoped<ITagRepository, TagRepository>();
 builder.Services.AddScoped<IValidator<NoteCreateDto>, NoteCreateDtoValidator>();
 builder.Services.AddScoped<IValidator<NoteUpdateDto>, NoteUpdateDtoValidator>();
 builder.Services.AddScoped<IValidator<TagDto>, TagDtoValidator>();
+builder.Services.AddScoped<IValidator<TagRequestDto>, TagRequestDtoValidator>();
 // Register AutoMapper
 builder.Services.AddAutoMapper(typeof(MappingConfig));
 
@@ -129,7 +130,6 @@ app.UseStaticFiles(new StaticFileOptions
 });
 
 app.UseHttpsRedirection();
-
 
 // Map NoteEndpoints
 app.MapNoteEndpoints();

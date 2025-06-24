@@ -43,7 +43,11 @@ namespace NotesSolution.Infrastructure.Repositories
                 return null;
 
             // Claims
-            var claims = new List<Claim> { new Claim(ClaimTypes.Name, user.UserName) };
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, user.UserName),
+                new Claim(ClaimTypes.NameIdentifier, user.Id)
+            };
 
             // JWT Token
             var tokenHandler = new JwtSecurityTokenHandler();

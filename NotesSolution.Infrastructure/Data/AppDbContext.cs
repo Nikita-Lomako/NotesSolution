@@ -19,7 +19,7 @@ namespace NotesSolution.Infrastructure.Data
             // Настройка связи многие-ко-многим
             modelBuilder.Entity<Note>()
                 .HasMany(n => n.Tags)
-                .WithMany();
+                .WithMany(t => t.Notes);
 
             // Ограничения для PostgreSQL
             modelBuilder.Entity<Note>(entity =>

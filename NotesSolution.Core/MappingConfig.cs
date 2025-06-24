@@ -20,7 +20,10 @@ namespace NotesSolution.Core
                 .ForMember(dest => dest.Tags, opt => opt.Ignore());
             CreateMap<NoteUpdateDto, Note>()
                 .ForMember(dest => dest.Tags, opt => opt.Ignore());
+
             CreateMap<Tag, TagDto>().ReverseMap();
+            CreateMap<TagRequestDto, Tag>();
+
             CreateMap<IdentityUser, UserDto>()
                 .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id))
                 .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.UserName));

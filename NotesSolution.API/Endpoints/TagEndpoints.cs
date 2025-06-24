@@ -21,10 +21,10 @@ namespace NotesSolution.API.Endpoints
             group.MapGet("/by-name/{name}", GetTagByName).WithName("GetTagByName").Produces<TagDto>(200).Produces(404).RequireAuthorization();
 
             group.MapPost("/", CreateTag).WithName("CreateTag")
-                .Accepts<TagDto>("application/json").Produces<TagDto>(201).Produces(400).RequireAuthorization();
+                .Accepts<TagRequestDto>("application/json").Produces<TagDto>(201).Produces(400).RequireAuthorization();
 
             group.MapPut("/{id}", UpdateTag).WithName("UpdateTag")
-                .Accepts<TagDto>("application/json").Produces<TagDto>(200).Produces(400).Produces(404).RequireAuthorization();
+                .Accepts<TagRequestDto>("application/json").Produces<TagDto>(200).Produces(400).Produces(404).RequireAuthorization();
 
             group.MapDelete("/{id}", DeleteTag).WithName("DeleteTag").Produces(204).Produces(404).RequireAuthorization();
 
@@ -45,9 +45,9 @@ namespace NotesSolution.API.Endpoints
         }
 
         private static async Task<IResult> CreateTag(
-            TagDto tagDto,
+            TagRequestDto tagDto,
             ITagRepository tagRepository,
-            IValidator<TagDto> validator,
+            IValidator<TagRequestDto> validator,
             IMapper mapper,
             ILogger<Program> logger,
             [FromServices] IHttpContextAccessor httpContextAccessor)
@@ -66,8 +66,7 @@ namespace NotesSolution.API.Endpoints
                 logger.LogWarning("Tag with name {Name} already exists", tagDto.Name);
                 return Results.Conflict($"Tag with name '{tagDto.Name}' already exists.");
             }
-            var tag = mapper.Map<Tag>(tagDto);
-            tag.UserId = userId;
+            var tag = new Tag { Name = tagDto.Name, UserId = userId };
             await tagRepository.CreateAsync(tag);
             await tagRepository.SaveAsync();
             var createdTagDto = mapper.Map<TagDto>(tag);
@@ -77,9 +76,9 @@ namespace NotesSolution.API.Endpoints
 
         private static async Task<IResult> UpdateTag(
             Guid id,
-            TagDto tagDto,
+            TagRequestDto tagDto,
             ITagRepository tagRepository,
-            IValidator<TagDto> validator,
+            IValidator<TagRequestDto> validator,
             IMapper mapper,
             ILogger<Program> logger,
             [FromServices] IHttpContextAccessor httpContextAccessor)
