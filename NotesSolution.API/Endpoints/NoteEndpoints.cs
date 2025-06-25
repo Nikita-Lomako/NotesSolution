@@ -11,6 +11,7 @@ using NotesSolution.Core.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using System.Security.Claims;
+using NotesSolution.API.Services;
 
 namespace NotesSolution.API.Endpoints
 {
@@ -38,37 +39,26 @@ namespace NotesSolution.API.Endpoints
         }
 
         private static async Task<IResult> GetAllNotes(
-            INoteRepository noteRepository,
-            IMapper mapper,
-            ILogger<Program> logger,
+            [FromServices] NoteService noteService,
             [FromServices] IHttpContextAccessor httpContextAccessor,
             [FromQuery] string? search, [FromQuery] string? tag, [FromQuery] string? sort, [FromQuery] string? order,
             [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
-            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
-            logger.LogInformation("Getting all notes with parameters: search={Search}, tag={Tag}, sort={Sort}, order={Order}, page={Page}, pageSize={PageSize}", search, tag, sort, order, page, pageSize);
-            var notes = await noteRepository.GetAllAsync(search, tag, sort, order, page, pageSize);
-            notes = notes.Where(n => n.UserId == userId).ToList();
-            var noteDtos = mapper.Map<List<NoteDto>>(notes);
-            return Results.Ok(noteDtos);
+            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+            var notes = await noteService.GetAllNotes(userId, search, tag, sort, order, page, pageSize);
+            return Results.Ok(notes);
         }
 
         private static async Task<IResult> GetNoteById(
             Guid id,
-            INoteRepository noteRepository,
-            IMapper mapper, ILogger<Program> logger,
+            [FromServices] NoteService noteService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
-            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
-            logger.LogInformation($"Getting note with id = {id}");
-            var note = await noteRepository.GetAsync(id);
-            if (note == null || note.UserId != userId)
-            {
-                logger.LogWarning($"Note with id {id} not found or not owned by user");
+            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+            var note = await noteService.GetNoteById(userId, id);
+            if (note == null)
                 return Results.NotFound();
-            }
-            var noteDto = mapper.Map<NoteDto>(note);
-            return Results.Ok(noteDto);
+            return Results.Ok(note);
         }
 
         private static List<string> NormalizeTags(string tags)
@@ -83,16 +73,10 @@ namespace NotesSolution.API.Endpoints
             [FromForm] string description,
             [FromForm] string tags,
             [FromForm] IFormFileCollection? images,
-            INoteRepository noteRepository,
-            ITagRepository tagRepository,
-            IImageService imageService,
-            IMapper mapper,
-            IValidator<NoteCreateDto> validator,
-            ILogger<Program> logger,
+            [FromServices] NoteService noteService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
-            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
-            logger.LogInformation("Attempting to create new note");
+            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
             var normalizedTags = NormalizeTags(tags);
             var noteDto = new NoteCreateDto
             {
@@ -101,51 +85,10 @@ namespace NotesSolution.API.Endpoints
                 Tags = normalizedTags,
                 ImageUrls = new List<string>()
             };
-            var validationResult = await validator.ValidateAsync(noteDto);
-            if (!validationResult.IsValid)
-            {
-                logger.LogWarning("Validation failed for new note: {Errors}", string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
-                return Results.BadRequest(validationResult.Errors);
-            }
-            var note = mapper.Map<Note>(noteDto);
-            note.UserId = userId;
-            var tagEntities = new List<Tag>();
-            foreach (var tagName in noteDto.Tags)
-            {
-                var existingTag = await tagRepository.GetByNameAsync(tagName);
-                if (existingTag != null && existingTag.UserId == userId)
-                {
-                    tagEntities.Add(existingTag);
-                }
-                else
-                {
-                    var newTag = new Tag { Name = tagName, UserId = userId };
-                    await tagRepository.CreateAsync(newTag);
-                    tagEntities.Add(newTag);
-                }
-            }
-            note.Tags = tagEntities;
-            note.CreationDate = DateTime.UtcNow;
-            // Handle image uploads with duplicate prevention
-            var imageHashes = new HashSet<string>();
-            if (images != null && images.Count > 0)
-            {
-                foreach (var image in images)
-                {
-                    var hash = await imageService.ComputeImageHashAsync(image);
-                    if (!imageHashes.Contains(hash))
-                    {
-                        var imageUrl = await imageService.SaveImageAsync(image);
-                        note.ImageUrls.Add(imageUrl);
-                        imageHashes.Add(hash);
-                    }
-                }
-            }
-            await noteRepository.CreateAsync(note);
-            await noteRepository.SaveAsync();
-            var createdNoteDto = mapper.Map<NoteDto>(note);
-            logger.LogInformation($"Created new note with id {note.Id}");
-            return Results.Created($"/api/notes/{createdNoteDto.Id}", createdNoteDto);
+            var (createdNote, errors) = await noteService.CreateNote(userId, noteDto, images);
+            if (errors.Count > 0)
+                return Results.BadRequest(errors);
+            return Results.Created($"/api/notes/{createdNote.Id}", createdNote);
         }
 
         private static async Task<IResult> UpdateNote(
@@ -154,16 +97,10 @@ namespace NotesSolution.API.Endpoints
             [FromForm] string description,
             [FromForm] string tags,
             [FromForm] IFormFileCollection? images,
-            INoteRepository noteRepository,
-            ITagRepository tagRepository,
-            IImageService imageService,
-            IMapper mapper,
-            IValidator<NoteUpdateDto> validator,
-            ILogger<Program> logger,
+            [FromServices] NoteService noteService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
-            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
-            logger.LogInformation($"Updating note with id {id}");
+            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
             var normalizedTags = NormalizeTags(tags);
             var noteDto = new NoteUpdateDto
             {
@@ -172,94 +109,23 @@ namespace NotesSolution.API.Endpoints
                 Tags = normalizedTags,
                 ImageUrls = new List<string>()
             };
-            var validationResult = await validator.ValidateAsync(noteDto);
-            if (!validationResult.IsValid)
-            {
-                logger.LogWarning("Validation failed for updating note {Id}: {Errors}", id, string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
-                return Results.BadRequest(validationResult.Errors);
-            }
-            var existingNote = await noteRepository.GetAsync(id);
-            if (existingNote == null || existingNote.UserId != userId)
-            {
-                logger.LogWarning($"Note with id {id} not found or not owned by user");
+            var (updatedNote, errors, notFound) = await noteService.UpdateNote(userId, id, noteDto, images);
+            if (notFound)
                 return Results.NotFound();
-            }
-            var tagEntities = new List<Tag>();
-            foreach (var tagName in noteDto.Tags)
-            {
-                var existingTag = await tagRepository.GetByNameAsync(tagName);
-                if (existingTag != null && existingTag.UserId == userId)
-                {
-                    tagEntities.Add(existingTag);
-                }
-                else
-                {
-                    var newTag = new Tag { Name = tagName, UserId = userId };
-                    await tagRepository.CreateAsync(newTag);
-                    tagEntities.Add(newTag);
-                }
-            }
-            mapper.Map(noteDto, existingNote);
-            existingNote.Tags = tagEntities;
-            // Clear previous images
-            if (existingNote.ImageUrls != null && existingNote.ImageUrls.Count > 0)
-            {
-                foreach (var imageUrl in existingNote.ImageUrls)
-                {
-                    imageService.DeleteImage(imageUrl);
-                }
-                existingNote.ImageUrls.Clear();
-            }
-            // Handle image uploads with duplicate prevention
-            var imageHashes = new HashSet<string>();
-            if (images != null && images.Count > 0)
-            {
-                foreach (var image in images)
-                {
-                    var hash = await imageService.ComputeImageHashAsync(image);
-                    if (!imageHashes.Contains(hash))
-                    {
-                        var imageUrl = await imageService.SaveImageAsync(image);
-                        existingNote.ImageUrls.Add(imageUrl);
-                        imageHashes.Add(hash);
-                    }
-                }
-            }
-            await noteRepository.UpdateAsync(existingNote);
-            await noteRepository.SaveAsync();
-            var updatedNoteDto = mapper.Map<NoteDto>(existingNote);
-            logger.LogInformation($"Updated note with id {id}");
-            return Results.Ok(updatedNoteDto);
+            if (errors.Count > 0)
+                return Results.BadRequest(errors);
+            return Results.Ok(updatedNote);
         }
 
         private static async Task<IResult> DeleteNote(
             Guid id,
-            INoteRepository noteRepository,
-            IImageService imageService, 
-            ILogger<Program> logger,
+            [FromServices] NoteService noteService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
-            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
-            logger.LogInformation($"Deleting note with id {id}");
-            var existingNote = await noteRepository.GetAsync(id);
-
-            if (existingNote == null || existingNote.UserId != userId)
-            {
-                logger.LogWarning($"Note with id {id} not found or not owned by user");
+            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+            var deleted = await noteService.DeleteNote(userId, id);
+            if (!deleted)
                 return Results.NotFound();
-            }
-
-            // �������� ����������� ����� ���������
-            var imageUrls = existingNote.ImageUrls?.ToList() ?? new List<string>();
-
-            await noteRepository.RemoveAsync(existingNote);
-
-            foreach (var imageUrl in imageUrls)
-            {
-                imageService.DeleteImage(imageUrl);
-            }
-
-            logger.LogInformation($"Note with id {id} deleted");
             return Results.NoContent();
         }
     }

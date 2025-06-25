@@ -16,11 +16,12 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.OpenApi.Models;
+using NotesSolution.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-// В начале метода builder.Build() добавить:
+// пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ builder.Build() пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ:
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new Exception("Database connection string not configured");
 
@@ -46,11 +47,19 @@ builder.Services.AddScoped<IImageService>(provider =>
 // Register NoteRepository
 builder.Services.AddScoped<INoteRepository, NoteRepository>();
 builder.Services.AddScoped<ITagRepository, TagRepository>();
+
+// Register NoteService
+builder.Services.AddScoped<NoteService>();
+
+// Register TagService
+builder.Services.AddScoped<TagService>();
+
 // Register validators
 builder.Services.AddScoped<IValidator<NoteCreateDto>, NoteCreateDtoValidator>();
 builder.Services.AddScoped<IValidator<NoteUpdateDto>, NoteUpdateDtoValidator>();
 builder.Services.AddScoped<IValidator<TagDto>, TagDtoValidator>();
 builder.Services.AddScoped<IValidator<TagRequestDto>, TagRequestDtoValidator>();
+
 // Register AutoMapper
 builder.Services.AddAutoMapper(typeof(MappingConfig));
 

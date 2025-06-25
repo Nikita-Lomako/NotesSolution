@@ -6,6 +6,7 @@ using NotesSolution.Core.Interfaces.IRepositories;
 using NotesSolution.Core.Models;
 using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
+using NotesSolution.API.Services;
 
 namespace NotesSolution.API.Endpoints
 {
@@ -31,151 +32,79 @@ namespace NotesSolution.API.Endpoints
         }
 
         private static async Task<IResult> GetAllTags(
-            ITagRepository tagRepository,
-            IMapper mapper,
-            ILogger<Program> logger,
+            [FromServices] TagService tagService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
             var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
-            logger.LogInformation("Getting all tags");
-            var tags = await tagRepository.GetAllAsync();
-            tags = tags.Where(t => t.UserId == userId).ToList();
-            var tagDtos = mapper.Map<List<TagDto>>(tags);
-            return Results.Ok(tagDtos);
+            var tags = await tagService.GetAllTags(userId);
+            return Results.Ok(tags);
         }
 
         private static async Task<IResult> CreateTag(
             TagRequestDto tagDto,
-            ITagRepository tagRepository,
-            IValidator<TagRequestDto> validator,
-            IMapper mapper,
-            ILogger<Program> logger,
+            [FromServices] TagService tagService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
             var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
-            logger.LogInformation("Attempting to create new tag");
-            var validationResult = await validator.ValidateAsync(tagDto);
-            if (!validationResult.IsValid)
-            {
-                logger.LogWarning("Validation failed for new tag: {Errors}", string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
-                return Results.BadRequest(validationResult.Errors);
-            }
-            var existingTag = await tagRepository.GetByNameAsync(tagDto.Name);
-            if (existingTag != null && existingTag.UserId == userId)
-            {
-                logger.LogWarning("Tag with name {Name} already exists", tagDto.Name);
+            var (createdTag, errors, conflict) = await tagService.CreateTag(userId, tagDto);
+            if (conflict)
                 return Results.Conflict($"Tag with name '{tagDto.Name}' already exists.");
-            }
-            var tag = new Tag { Name = tagDto.Name, UserId = userId };
-            await tagRepository.CreateAsync(tag);
-            await tagRepository.SaveAsync();
-            var createdTagDto = mapper.Map<TagDto>(tag);
-            logger.LogInformation("Created new tag with id {Id}", tag.Id);
-            return Results.Created($"/api/tags/{createdTagDto.Id}", createdTagDto);
+            if (errors.Count > 0)
+                return Results.BadRequest(errors);
+            return Results.Created($"/api/tags/{createdTag.Id}", createdTag);
         }
 
         private static async Task<IResult> UpdateTag(
             Guid id,
             TagRequestDto tagDto,
-            ITagRepository tagRepository,
-            IValidator<TagRequestDto> validator,
-            IMapper mapper,
-            ILogger<Program> logger,
+            [FromServices] TagService tagService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
             var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
-            logger.LogInformation($"Updating tag with id {id}");
-            var validationResult = await validator.ValidateAsync(tagDto);
-            if (!validationResult.IsValid)
-            {
-                logger.LogWarning("Validation failed for updating tag {Id}: {Errors}", id, string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
-                return Results.BadRequest(validationResult.Errors);
-            }
-            var existingTag = await tagRepository.GetAsync(id);
-            if (existingTag == null || existingTag.UserId != userId)
-            {
-                logger.LogWarning($"Tag with id {id} not found or not owned by user");
+            var (updatedTag, errors, notFound, conflict) = await tagService.UpdateTag(userId, id, tagDto);
+            if (notFound)
                 return Results.NotFound();
-            }
-            var tagWithSameName = await tagRepository.GetByNameAsync(tagDto.Name);
-            if (tagWithSameName != null && tagWithSameName.Id != id && tagWithSameName.UserId == userId)
-            {
-                logger.LogWarning("Tag with name {Name} already exists", tagDto.Name);
+            if (conflict)
                 return Results.Conflict($"Tag with name '{tagDto.Name}' already exists.");
-            }
-            existingTag.Name = tagDto.Name;
-            await tagRepository.UpdateAsync(existingTag);
-            await tagRepository.SaveAsync();
-            var updatedTagDto = mapper.Map<TagDto>(existingTag);
-            logger.LogInformation($"Updated tag with id {id}");
-            return Results.Ok(updatedTagDto);
+            if (errors.Count > 0)
+                return Results.BadRequest(errors);
+            return Results.Ok(updatedTag);
         }
 
         private static async Task<IResult> DeleteTag(
             Guid id,
-            ITagRepository tagRepository,
-            INoteRepository noteRepository,
-            IMapper mapper,
-            ILogger<Program> logger,
+            [FromServices] TagService tagService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
             var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
-            logger.LogInformation($"Deleting tag with id {id}");
-            var tag = await tagRepository.GetAsync(id);
-            if (tag == null || tag.UserId != userId)
-            {
-                logger.LogWarning($"Tag with id {id} not found or not owned by user");
+            var deleted = await tagService.DeleteTag(userId, id);
+            if (!deleted)
                 return Results.NotFound();
-            }
-            // Remove tag from all notes
-            var notes = await noteRepository.GetAllAsync(null, null, null, null, 1, int.MaxValue);
-            foreach (var note in notes.Where(n => n.UserId == userId))
-            {
-                note.Tags.RemoveAll(t => t.Id == id);
-                await noteRepository.UpdateAsync(note);
-            }
-            await tagRepository.RemoveAsync(tag);
-            await tagRepository.SaveAsync();
-            logger.LogInformation($"Deleted tag with id {id}");
             return Results.NoContent();
         }
 
         private static async Task<IResult> GetTagById(
             Guid id,
-            ITagRepository tagRepository,
-            IMapper mapper,
-            ILogger<Program> logger,
+            [FromServices] TagService tagService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
             var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
-            logger.LogInformation($"Getting tag with id = {id}");
-            var tag = await tagRepository.GetAsync(id);
-            if (tag == null || tag.UserId != userId)
-            {
-                logger.LogWarning($"Tag with id {id} not found or not owned by user");
+            var tag = await tagService.GetTagById(userId, id);
+            if (tag == null)
                 return Results.NotFound();
-            }
-            var tagDto = mapper.Map<TagDto>(tag);
-            return Results.Ok(tagDto);
+            return Results.Ok(tag);
         }
 
         private static async Task<IResult> GetTagByName(
             string name,
-            ITagRepository tagRepository,
-            IMapper mapper,
-            ILogger<Program> logger,
+            [FromServices] TagService tagService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
             var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
-            logger.LogInformation($"Getting tag with name = {name}");
-            var tag = await tagRepository.GetByNameAsync(name);
-            if (tag == null || tag.UserId != userId)
-            {
-                logger.LogWarning($"Tag with name {name} not found or not owned by user");
+            var tag = await tagService.GetTagByName(userId, name);
+            if (tag == null)
                 return Results.NotFound();
-            }
-            var tagDto = mapper.Map<TagDto>(tag);
-            return Results.Ok(tagDto);
+            return Results.Ok(tag);
         }
     }
 } 

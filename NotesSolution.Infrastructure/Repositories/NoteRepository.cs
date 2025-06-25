@@ -16,7 +16,7 @@ namespace NotesSolution.Infrastructure.Repositories
 
         public async Task<ICollection<Note>> GetAllAsync(string? search, string? tag, string? sort, string? order, int page, int pageSize)
         {
-            var query = _db.Notes.Include(n => n.Tags).AsNoTracking().AsQueryable();
+            var query = _db.Notes.Include(n => n.Tags).AsQueryable();
 
             if (!string.IsNullOrEmpty(search))
             {
