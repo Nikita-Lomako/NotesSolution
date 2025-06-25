@@ -32,6 +32,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\NotesSolution.API\NotesSolution.API.csproj" />
     <ProjectReference Include="..\NotesSolution.Infrastructure\NotesSolution.Infrastructure.csproj" />
   </ItemGroup>
 
