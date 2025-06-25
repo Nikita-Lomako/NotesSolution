@@ -6,8 +6,10 @@ services:
     depends_on:
       - db
     environment:
+      - ImageStorage__BaseUrl=https://localhost:8081/images
+      - ApiSettings__Secret=${JWT_SECRET}
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=notesdb;Username=postgres;Password=${DB_PASSWORD}
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=notesdb;Username=postgres;Password=postgrespw
       - ASPNETCORE_HTTP_PORTS=8080
       - ASPNETCORE_HTTPS_PORTS=8081
     ports:

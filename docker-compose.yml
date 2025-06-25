@@ -4,7 +4,7 @@ services:
     image: postgres:15
     container_name: notes_db
     environment:
-      POSTGRES_PASSWORD: postgrespw
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: notesdb
     ports:
       - "5432:5432"
@@ -19,7 +19,16 @@ services:
     depends_on:
       - db
     environment:
-      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=notesdb;Username=postgres;Password=postgrespw
+      - ImageStorage__BaseUrl=https://localhost:8081/images
+      - ApiSettings__Secret=${JWT_SECRET}
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=notesdb;Username=postgres;Password=${DB_PASSWORD}
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ASPNETCORE_HTTPS_PORTS=8081
+    ports:
+        - "8080:8080"
+        - "8081:8081"
+    volumes:
+      - ./app-images:/app/images
 
 volumes:
   pgdata:

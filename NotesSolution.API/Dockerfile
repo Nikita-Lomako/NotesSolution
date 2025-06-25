@@ -27,6 +27,7 @@ RUN dotnet publish "./NotesSolution.API.csproj" -c $BUILD_CONFIGURATION -o /app/
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+COPY ./app-images ./images
 
 
 RUN mkdir -p /app/images

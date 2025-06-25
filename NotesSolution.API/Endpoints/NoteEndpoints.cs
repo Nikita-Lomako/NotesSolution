@@ -113,7 +113,7 @@ namespace NotesSolution.API.Endpoints
             foreach (var tagName in noteDto.Tags)
             {
                 var existingTag = await tagRepository.GetByNameAsync(tagName);
-                if (existingTag != null)
+                if (existingTag != null && existingTag.UserId == userId)
                 {
                     tagEntities.Add(existingTag);
                 }
@@ -126,13 +126,19 @@ namespace NotesSolution.API.Endpoints
             }
             note.Tags = tagEntities;
             note.CreationDate = DateTime.UtcNow;
-            // Handle image uploads
+            // Handle image uploads with duplicate prevention
+            var imageHashes = new HashSet<string>();
             if (images != null && images.Count > 0)
             {
                 foreach (var image in images)
                 {
-                    var imageUrl = await imageService.SaveImageAsync(image);
-                    note.ImageUrls.Add(imageUrl);
+                    var hash = await imageService.ComputeImageHashAsync(image);
+                    if (!imageHashes.Contains(hash))
+                    {
+                        var imageUrl = await imageService.SaveImageAsync(image);
+                        note.ImageUrls.Add(imageUrl);
+                        imageHashes.Add(hash);
+                    }
                 }
             }
             await noteRepository.CreateAsync(note);
@@ -182,7 +188,7 @@ namespace NotesSolution.API.Endpoints
             foreach (var tagName in noteDto.Tags)
             {
                 var existingTag = await tagRepository.GetByNameAsync(tagName);
-                if (existingTag != null)
+                if (existingTag != null && existingTag.UserId == userId)
                 {
                     tagEntities.Add(existingTag);
                 }
@@ -195,13 +201,28 @@ namespace NotesSolution.API.Endpoints
             }
             mapper.Map(noteDto, existingNote);
             existingNote.Tags = tagEntities;
-            // Handle image uploads
+            // Clear previous images
+            if (existingNote.ImageUrls != null && existingNote.ImageUrls.Count > 0)
+            {
+                foreach (var imageUrl in existingNote.ImageUrls)
+                {
+                    imageService.DeleteImage(imageUrl);
+                }
+                existingNote.ImageUrls.Clear();
+            }
+            // Handle image uploads with duplicate prevention
+            var imageHashes = new HashSet<string>();
             if (images != null && images.Count > 0)
             {
                 foreach (var image in images)
                 {
-                    var imageUrl = await imageService.SaveImageAsync(image);
-                    existingNote.ImageUrls.Add(imageUrl);
+                    var hash = await imageService.ComputeImageHashAsync(image);
+                    if (!imageHashes.Contains(hash))
+                    {
+                        var imageUrl = await imageService.SaveImageAsync(image);
+                        existingNote.ImageUrls.Add(imageUrl);
+                        imageHashes.Add(hash);
+                    }
                 }
             }
             await noteRepository.UpdateAsync(existingNote);
@@ -211,17 +232,33 @@ namespace NotesSolution.API.Endpoints
             return Results.Ok(updatedNoteDto);
         }
 
-        private static async Task<IResult> DeleteNote(Guid id, INoteRepository noteRepository, ILogger<Program> logger, [FromServices] IHttpContextAccessor httpContextAccessor)
+        private static async Task<IResult> DeleteNote(
+            Guid id,
+            INoteRepository noteRepository,
+            IImageService imageService, 
+            ILogger<Program> logger,
+            [FromServices] IHttpContextAccessor httpContextAccessor)
         {
             var userId = httpContextAccessor.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
             logger.LogInformation($"Deleting note with id {id}");
             var existingNote = await noteRepository.GetAsync(id);
+
             if (existingNote == null || existingNote.UserId != userId)
             {
                 logger.LogWarning($"Note with id {id} not found or not owned by user");
                 return Results.NotFound();
             }
+
+            // �������� ����������� ����� ���������
+            var imageUrls = existingNote.ImageUrls?.ToList() ?? new List<string>();
+
             await noteRepository.RemoveAsync(existingNote);
+
+            foreach (var imageUrl in imageUrls)
+            {
+                imageService.DeleteImage(imageUrl);
+            }
+
             logger.LogInformation($"Note with id {id} deleted");
             return Results.NoContent();
         }

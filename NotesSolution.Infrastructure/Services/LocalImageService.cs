@@ -30,7 +30,7 @@ namespace NotesSolution.Infrastructure.Services
             using var stream = new FileStream(filePath, FileMode.Create);
             await file.CopyToAsync(stream);
 
-            return $"{_baseUrl}/{fileName}";
+            return $"/images/{fileName}";
         }
 
         public bool DeleteImage(string imageUrl)
@@ -43,6 +43,14 @@ namespace NotesSolution.Infrastructure.Services
 
             File.Delete(filePath);
             return true;
+        }
+
+        public async Task<string> ComputeImageHashAsync(IFormFile file)
+        {
+            using var stream = file.OpenReadStream();
+            using var sha256 = System.Security.Cryptography.SHA256.Create();
+            var hash = await sha256.ComputeHashAsync(stream);
+            return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
         }
     }
 }

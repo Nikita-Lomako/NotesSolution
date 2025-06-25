@@ -11,5 +11,6 @@ namespace NotesSolution.Core.Interfaces
     {
         Task<string> SaveImageAsync(IFormFile file);
         bool DeleteImage(string imageUrl);
+        Task<string> ComputeImageHashAsync(IFormFile file);
     }
 }

@@ -31,7 +31,7 @@ namespace NotesSolution.Infrastructure.Data
             modelBuilder.Entity<Tag>(entity =>
             {
                 entity.Property(t => t.Name).HasMaxLength(50);
-                entity.HasIndex(t => t.Name).IsUnique();
+                entity.HasIndex(t => new { t.UserId, t.Name }).IsUnique();
             });
         }
     }

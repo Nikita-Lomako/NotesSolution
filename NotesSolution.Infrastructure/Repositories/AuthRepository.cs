@@ -26,8 +26,8 @@ namespace NotesSolution.Infrastructure.Repositories
             _configuration = configuration;
             _mapper = mapper;
             _db = db;
-            _secretKey = _configuration.GetSection("ApiSettings:Secret").Value 
-                ?? throw new ArgumentNullException("Secret key is missing in config");
+            _secretKey = _configuration["ApiSettings:Secret"]
+                ?? throw new ArgumentNullException("Secret key is missing");
         }
 
         public bool IsUniqueUser(string username)
