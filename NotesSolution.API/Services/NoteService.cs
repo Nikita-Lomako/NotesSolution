@@ -22,6 +22,7 @@ namespace NotesSolution.API.Services
         private readonly IValidator<NoteCreateDto> _createValidator;
         private readonly IValidator<NoteUpdateDto> _updateValidator;
         private readonly ILogger<NoteService> _logger;
+        private readonly ITagHelperService _tagHelperService;
 
         public NoteService(
             INoteRepository noteRepository,
@@ -30,7 +31,8 @@ namespace NotesSolution.API.Services
             IMapper mapper,
             IValidator<NoteCreateDto> createValidator,
             IValidator<NoteUpdateDto> updateValidator,
-            ILogger<NoteService> logger)
+            ILogger<NoteService> logger,
+            ITagHelperService tagHelperService)
         {
             _noteRepository = noteRepository;
             _tagRepository = tagRepository;
@@ -39,6 +41,7 @@ namespace NotesSolution.API.Services
             _createValidator = createValidator;
             _updateValidator = updateValidator;
             _logger = logger;
+            _tagHelperService = tagHelperService;
         }
 
         public async Task<List<NoteDto>> GetAllNotes(string userId, string? search, string? tag, string? sort, string? order, int page, int pageSize)
@@ -50,11 +53,17 @@ namespace NotesSolution.API.Services
             return _mapper.Map<List<NoteDto>>(notes);
         }
 
+        private async Task<Note?> GetUserNoteByIdAsync(string userId, Guid id)
+        {
+            var note = await _noteRepository.GetAsync(id);
+            return note != null && note.UserId == userId ? note : null;
+        }
+
         public async Task<NoteDto?> GetNoteById(string userId, Guid id)
         {
             _logger.LogInformation("Getting note with id = {Id} for user {UserId}", id, userId);
-            var note = await _noteRepository.GetAsync(id);
-            if (note == null || note.UserId != userId)
+            var note = await GetUserNoteByIdAsync(userId, id);
+            if (note == null)
             {
                 _logger.LogWarning("Note with id {Id} not found or not owned by user {UserId}", id, userId);
                 return null;
@@ -73,25 +82,15 @@ namespace NotesSolution.API.Services
                 return (null, validationResult.Errors.Select(e => e.ErrorMessage).ToList());
             }
             var note = _mapper.Map<Note>(noteDto);
+
             note.UserId = userId;
-            var tagEntities = new List<Tag>();
-            foreach (var tagName in noteDto.Tags)
-            {
-                var existingTag = await _tagRepository.GetByNameAsync(tagName);
-                if (existingTag != null && existingTag.UserId == userId)
-                {
-                    tagEntities.Add(existingTag);
-                }
-                else
-                {
-                    var newTag = new Tag { Name = tagName, UserId = userId };
-                    await _tagRepository.CreateAsync(newTag);
-                    tagEntities.Add(newTag);
-                }
-            }
+
+            var tagEntities = await _tagHelperService.GetOrCreateTagsAsync(noteDto.Tags, userId);
+
             note.Tags = tagEntities;
             note.CreationDate = DateTime.UtcNow;
             var imageHashes = new HashSet<string>();
+            
             if (images != null && images.Count > 0)
             {
                 foreach (var image in images)
@@ -120,27 +119,15 @@ namespace NotesSolution.API.Services
                 _logger.LogWarning("Validation failed for updating note {Id}: {Errors}", id, string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
                 return (null, validationResult.Errors.Select(e => e.ErrorMessage).ToList(), false);
             }
-            var existingNote = await _noteRepository.GetAsync(id);
-            if (existingNote == null || existingNote.UserId != userId)
+            var existingNote = await GetUserNoteByIdAsync(userId, id);
+            if (existingNote == null)
             {
                 _logger.LogWarning("Note with id {Id} not found or not owned by user {UserId}", id, userId);
                 return (null, new List<string>(), true);
             }
-            var tagEntities = new List<Tag>();
-            foreach (var tagName in noteDto.Tags)
-            {
-                var existingTag = await _tagRepository.GetByNameAsync(tagName);
-                if (existingTag != null && existingTag.UserId == userId)
-                {
-                    tagEntities.Add(existingTag);
-                }
-                else
-                {
-                    var newTag = new Tag { Name = tagName, UserId = userId };
-                    await _tagRepository.CreateAsync(newTag);
-                    tagEntities.Add(newTag);
-                }
-            }
+            
+            var tagEntities = await _tagHelperService.GetOrCreateTagsAsync(noteDto.Tags, userId);
+
             _mapper.Map(noteDto, existingNote);
             existingNote.Tags = tagEntities;
             if (existingNote.ImageUrls != null && existingNote.ImageUrls.Count > 0)
@@ -174,8 +161,8 @@ namespace NotesSolution.API.Services
         public async Task<bool> DeleteNote(string userId, Guid id)
         {
             _logger.LogInformation("Deleting note with id {Id} for user {UserId}", id, userId);
-            var existingNote = await _noteRepository.GetAsync(id);
-            if (existingNote == null || existingNote.UserId != userId)
+            var existingNote = await GetUserNoteByIdAsync(userId, id);
+            if (existingNote == null)
             {
                 _logger.LogWarning("Note with id {Id} not found or not owned by user {UserId}", id, userId);
                 return false;

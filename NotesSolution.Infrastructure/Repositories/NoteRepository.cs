@@ -51,7 +51,7 @@ namespace NotesSolution.Infrastructure.Repositories
                 .ToListAsync();
         }
 
-        public async Task<Note?> GetAsync(Guid id) => await _db.Notes.Include(n => n.Tags).AsNoTracking().FirstOrDefaultAsync(n => n.Id == id);
+        public async Task<Note?> GetAsync(Guid id) => await _db.Notes.Include(n => n.Tags).FirstOrDefaultAsync(n => n.Id == id);
         public async Task CreateAsync(Note note)
         {
             for (int i = 0; i < note.Tags.Count; i++)
