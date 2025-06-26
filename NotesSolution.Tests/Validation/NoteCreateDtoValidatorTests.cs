@@ -37,15 +37,15 @@ namespace NotesSolution.Tests.Validation
         [InlineData("")]
         [InlineData("   ")]
         [InlineData(null)]
-        public void Should_Fail_When_Name_Is_Empty_Or_Null(string name)
+        public void Should_Fail_When_Name_Is_Empty_Or_Null(string? name)
         {
             // Arrange
             var dto = new NoteCreateDto
             {
                 Name = name,
-                Description = "Test Description",
-                Tags = new List<string>(),
-                ImageUrls = new List<string>()
+                Description = "Valid description",
+                Tags = new List<string> { "tag1" },
+                ImageUrls = new List<string> { "image1.jpg" }
             };
 
             // Act

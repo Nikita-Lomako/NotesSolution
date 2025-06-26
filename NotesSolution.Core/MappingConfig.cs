@@ -14,10 +14,13 @@ namespace NotesSolution.Core
     {
         public MappingConfig()
         {
+            // Note mappings
             CreateMap<Note, NoteDto>()
                 .ForMember(dest => dest.Tags, opt => opt.MapFrom(src => src.Tags.Select(t => t.Name).ToList()));
+            
             CreateMap<NoteCreateDto, Note>()
                 .ForMember(dest => dest.Tags, opt => opt.Ignore());
+                
             CreateMap<NoteUpdateDto, Note>()
                 .ForMember(dest => dest.Tags, opt => opt.Ignore());
 
