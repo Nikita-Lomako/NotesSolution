@@ -13,15 +13,15 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NotesSolution.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250623183959_AddedAuth")]
-    partial class AddedAuth
+    [Migration("20250626203748_EditUserNameToName")]
+    partial class EditUserNameToName
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.6")
+                .HasAnnotation("ProductVersion", "9.0.1")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -224,13 +224,13 @@ namespace NotesSolution.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("NoteTag", b =>
                 {
-                    b.Property<Guid>("NoteId")
+                    b.Property<Guid>("NotesId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("TagsId")
                         .HasColumnType("uuid");
 
-                    b.HasKey("NoteId", "TagsId");
+                    b.HasKey("NotesId", "TagsId");
 
                     b.HasIndex("TagsId");
 
@@ -286,7 +286,7 @@ namespace NotesSolution.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("UserId", "Name")
                         .IsUnique();
 
                     b.ToTable("Tags");
@@ -347,7 +347,7 @@ namespace NotesSolution.Infrastructure.Data.Migrations
                 {
                     b.HasOne("NotesSolution.Core.Models.Note", null)
                         .WithMany()
-                        .HasForeignKey("NoteId")
+                        .HasForeignKey("NotesId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

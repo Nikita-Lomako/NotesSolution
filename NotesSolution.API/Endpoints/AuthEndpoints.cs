@@ -45,7 +45,7 @@ namespace NotesSolution.API.Endpoints
                 return Results.BadRequest(new { Error = "Username already exists" });
             }
             var registerResponse = await authRepo.Register(model);
-            if (registerResponse == null || string.IsNullOrEmpty(registerResponse.UserName))
+            if (registerResponse == null || string.IsNullOrEmpty(registerResponse.Name))
             {
                 return Results.BadRequest(new { Error = "Registration failed. Please check provided information." });
             }
