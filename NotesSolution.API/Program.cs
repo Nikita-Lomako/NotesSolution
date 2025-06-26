@@ -17,6 +17,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.OpenApi.Models;
 using NotesSolution.API.Services;
+using NotesSolution.Core.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -48,11 +49,16 @@ builder.Services.AddScoped<IImageService>(provider =>
 builder.Services.AddScoped<INoteRepository, NoteRepository>();
 builder.Services.AddScoped<ITagRepository, TagRepository>();
 
+// Register TagHelperService
+builder.Services.AddScoped<ITagHelperService, TagHelperService>();
+
 // Register NoteService
 builder.Services.AddScoped<NoteService>();
 
 // Register TagService
 builder.Services.AddScoped<TagService>();
+
+
 
 // Register validators
 builder.Services.AddScoped<IValidator<NoteCreateDto>, NoteCreateDtoValidator>();

@@ -45,8 +45,8 @@ namespace NotesSolution.API.Services
         public async Task<TagDto?> GetTagById(string userId, Guid id)
         {
             _logger.LogInformation("Getting tag with id = {Id} for user {UserId}", id, userId);
-            var tag = await _tagRepository.GetAsync(id);
-            if (tag == null || tag.UserId != userId)
+            var tag = await GetUserTagByIdAsync(userId, id);
+            if (tag == null)
             {
                 _logger.LogWarning("Tag with id {Id} not found or not owned by user {UserId}", id, userId);
                 return null;
@@ -58,8 +58,8 @@ namespace NotesSolution.API.Services
         public async Task<TagDto?> GetTagByName(string userId, string name)
         {
             _logger.LogInformation("Getting tag with name = {Name} for user {UserId}", name, userId);
-            var tag = await _tagRepository.GetByNameAsync(name);
-            if (tag == null || tag.UserId != userId)
+            var tag = await GetUserTagByNameAsync(userId, name);
+            if (tag == null)
             {
                 _logger.LogWarning("Tag with name {Name} not found or not owned by user {UserId}", name, userId);
                 return null;
@@ -99,14 +99,14 @@ namespace NotesSolution.API.Services
                 _logger.LogWarning("Validation failed for updating tag {Id}: {Errors}", id, string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
                 return (null, validationResult.Errors.Select(e => e.ErrorMessage).ToList(), false, false);
             }
-            var existingTag = await _tagRepository.GetAsync(id);
-            if (existingTag == null || existingTag.UserId != userId)
+            var existingTag = await GetUserTagByIdAsync(userId, id);
+            if (existingTag == null)
             {
                 _logger.LogWarning("Tag with id {Id} not found or not owned by user {UserId}", id, userId);
                 return (null, new List<string>(), true, false);
             }
-            var tagWithSameName = await _tagRepository.GetByNameAsync(tagDto.Name);
-            if (tagWithSameName != null && tagWithSameName.Id != id && tagWithSameName.UserId == userId)
+            var tagWithSameName = await GetUserTagByNameAsync(userId, tagDto.Name);
+            if (tagWithSameName != null && tagWithSameName.Id != id)
             {
                 _logger.LogWarning("Tag with name {Name} already exists for user {UserId}", tagDto.Name, userId);
                 return (null, new List<string>(), false, true);
@@ -121,28 +121,39 @@ namespace NotesSolution.API.Services
         public async Task<bool> DeleteTag(string userId, Guid id)
         {
             _logger.LogInformation("Deleting tag with id {Id} for user {UserId}", id, userId);
-            var tag = await _tagRepository.GetAsync(id);
-            if (tag == null || tag.UserId != userId)
+            var tag = await GetUserTagByIdAsync(userId, id);
+            if (tag == null)
             {
                 _logger.LogWarning("Tag with id {Id} not found or not owned by user {UserId}", id, userId);
                 return false;
             }
-            // Remove tag from all notes
-            var notes = await _noteRepository.GetAllAsync(null, null, null, null, 1, int.MaxValue);
-            foreach (var note in notes.Where(n => n.UserId == userId && n.Tags.Any(t => t.Id == id)))
-            {
-                note.Tags.RemoveAll(t => t.Id == id);
-                await _noteRepository.UpdateAsync(note);
-            }
-
-            // Отключаем тег от трекинга EF, если он всё ещё привязан
-            // (иногда помогает: _db.Entry(tag).State = EntityState.Detached;)
-
-            // Теперь удаляем тег
+            await RemoveTagFromAllUserNotesAsync(userId, id);
             await _tagRepository.RemoveAsync(tag);
             await _tagRepository.SaveAsync();
             _logger.LogInformation("Deleted tag with id {Id} for user {UserId}", id, userId);
             return true;
+        }
+
+        private async Task<Tag?> GetUserTagByIdAsync(string userId, Guid id)
+        {
+            var tag = await _tagRepository.GetAsync(id);
+            return tag != null && tag.UserId == userId ? tag : null;
+        }
+
+        private async Task<Tag?> GetUserTagByNameAsync(string userId, string name)
+        {
+            var tag = await _tagRepository.GetByNameAsync(name);
+            return tag != null && tag.UserId == userId ? tag : null;
+        }
+
+        private async Task RemoveTagFromAllUserNotesAsync(string userId, Guid tagId)
+        {
+            var notes = await _noteRepository.GetAllAsync(null, null, null, null, 1, int.MaxValue);
+            foreach (var note in notes.Where(n => n.UserId == userId && n.Tags.Any(t => t.Id == tagId)))
+            {
+                note.Tags.RemoveAll(t => t.Id == tagId);
+                await _noteRepository.UpdateAsync(note);
+            }
         }
     }
 }

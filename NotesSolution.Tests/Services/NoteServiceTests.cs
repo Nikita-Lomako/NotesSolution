@@ -20,6 +20,7 @@ namespace NotesSolution.Tests.Services
         private readonly Mock<IValidator<NoteCreateDto>> _mockCreateValidator;
         private readonly Mock<IValidator<NoteUpdateDto>> _mockUpdateValidator;
         private readonly Mock<ILogger<NoteService>> _mockLogger;
+        private readonly Mock<ITagHelperService> _mockTagHelperService;
         private readonly NoteService _noteService;
 
         public NoteServiceTests()
@@ -31,6 +32,7 @@ namespace NotesSolution.Tests.Services
             _mockCreateValidator = new Mock<IValidator<NoteCreateDto>>();
             _mockUpdateValidator = new Mock<IValidator<NoteUpdateDto>>();
             _mockLogger = new Mock<ILogger<NoteService>>();
+            _mockTagHelperService = new Mock<ITagHelperService>();
 
             _noteService = new NoteService(
                 _mockNoteRepository.Object,
@@ -39,7 +41,9 @@ namespace NotesSolution.Tests.Services
                 _mockMapper.Object,
                 _mockCreateValidator.Object,
                 _mockUpdateValidator.Object,
-                _mockLogger.Object
+                _mockLogger.Object,
+                _mockTagHelperService.Object
+
             );
         }
 
