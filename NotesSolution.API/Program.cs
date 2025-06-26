@@ -22,7 +22,6 @@ using NotesSolution.Core.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-// � ������ ������ builder.Build() ��������:
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new Exception("Database connection string not configured");
 

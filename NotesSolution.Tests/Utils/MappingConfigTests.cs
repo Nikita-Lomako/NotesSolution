@@ -109,7 +109,7 @@ namespace NotesSolution.Tests.Utils
 
             // Assert
             Assert.Equal(identityUser.Id, userDto.Id);
-            Assert.Equal(identityUser.UserName, userDto.UserName);
+            Assert.Equal(identityUser.UserName, userDto.Name);
         }      
     }
 }
