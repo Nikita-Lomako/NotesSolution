@@ -16,12 +16,12 @@ namespace NotesSolution.Infrastructure.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
-            // Настройка связи многие-ко-многим
+            // Many-to-many relationship configuration
             modelBuilder.Entity<Note>()
                 .HasMany(n => n.Tags)
                 .WithMany(t => t.Notes);
 
-            // Ограничения для PostgreSQL
+            // PostgreSQL constraints
             modelBuilder.Entity<Note>(entity =>
             {
                 entity.Property(n => n.Name).HasMaxLength(100);
