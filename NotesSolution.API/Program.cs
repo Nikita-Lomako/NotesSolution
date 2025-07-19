@@ -58,6 +58,7 @@ builder.Services.AddScoped<INoteService, NoteService>();
 builder.Services.AddScoped<ITagService, TagService>();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IJwtService, JwtService>();
 
 
 // Register validators

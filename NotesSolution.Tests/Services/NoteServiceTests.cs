@@ -1,6 +1,7 @@
 using AutoMapper;
 using FluentValidation;
 using FluentValidation.Results;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Moq;
 using NotesSolution.Core.Interfaces.IRepositories;
@@ -8,6 +9,11 @@ using NotesSolution.Core.Interfaces;
 using NotesSolution.Core.Models;
 using NotesSolution.Application.Dtos;
 using NotesSolution.Application.Services;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Xunit;
+using System;
+using System.Linq;
 
 namespace NotesSolution.Tests.Services
 {
@@ -49,47 +55,29 @@ namespace NotesSolution.Tests.Services
         [Fact]
         public async Task GetAllNotes_ReturnsFilteredNotesForUser()
         {
-            // Arrange
             var userId = "user1";
             var notes = new List<Note>
             {
                 new Note { Id = Guid.NewGuid(), Name = "Note1", UserId = userId },
-                new Note { Id = Guid.NewGuid(), Name = "Note2", UserId = userId },
-                new Note { Id = Guid.NewGuid(), Name = "Note3", UserId = "user2" }
+                new Note { Id = Guid.NewGuid(), Name = "Note2", UserId = userId }
             };
-            var noteDtos = notes.Where(n => n.UserId == userId).Select(n => new NoteDto { Id = n.Id, Name = n.Name }).ToList();
-
-            _mockNoteRepository.Setup(r => r.GetAllAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>()))
-                .ReturnsAsync(notes);
-            _mockMapper.Setup(m => m.Map<List<NoteDto>>(It.IsAny<List<Note>>()))
-                .Returns(noteDtos);
-
-            // Act
+            var noteDtos = notes.Select(n => new NoteDto { Id = n.Id, Name = n.Name }).ToList();
+            _mockNoteRepository.Setup(r => r.GetAllAsync(userId, null, null, null, null, 1, 10)).ReturnsAsync(notes);
+            _mockMapper.Setup(m => m.Map<List<NoteDto>>(notes)).Returns(noteDtos);
             var result = await _noteService.GetAllNotes(userId, null, null, null, null, 1, 10);
-
-            // Assert
             Assert.Equal(2, result.Count);
-            Assert.All(result, dto => Assert.Equal(userId, notes.First(n => n.Id == dto.Id).UserId));
         }
 
         [Fact]
         public async Task GetNoteById_ReturnsNote_WhenNoteExistsAndOwnedByUser()
         {
-            // Arrange
             var userId = "user1";
             var noteId = Guid.NewGuid();
             var note = new Note { Id = noteId, Name = "Test Note", UserId = userId };
             var noteDto = new NoteDto { Id = noteId, Name = "Test Note" };
-
-            _mockNoteRepository.Setup(r => r.GetAsync(noteId))
-                .ReturnsAsync(note);
-            _mockMapper.Setup(m => m.Map<NoteDto>(note))
-                .Returns(noteDto);
-
-            // Act
+            _mockNoteRepository.Setup(r => r.GetAsync(userId, noteId)).ReturnsAsync(note);
+            _mockMapper.Setup(m => m.Map<NoteDto>(note)).Returns(noteDto);
             var result = await _noteService.GetNoteById(userId, noteId);
-
-            // Assert
             Assert.NotNull(result);
             Assert.Equal(noteId, result.Id);
         }
@@ -97,54 +85,22 @@ namespace NotesSolution.Tests.Services
         [Fact]
         public async Task GetNoteById_ReturnsNull_WhenNoteDoesNotExist()
         {
-            // Arrange
             var userId = "user1";
             var noteId = Guid.NewGuid();
-
-            _mockNoteRepository.Setup(r => r.GetAsync(noteId))
-                .ReturnsAsync((Note?)null);
-
-            // Act
+            _mockNoteRepository.Setup(r => r.GetAsync(userId, noteId)).ReturnsAsync((Note?)null);
             var result = await _noteService.GetNoteById(userId, noteId);
-
-            // Assert
-            Assert.Null(result);
-        }
-
-        [Fact]
-        public async Task GetNoteById_ReturnsNull_WhenNoteNotOwnedByUser()
-        {
-            // Arrange
-            var userId = "user1";
-            var noteId = Guid.NewGuid();
-            var note = new Note { Id = noteId, Name = "Test Note", UserId = "user2" };
-
-            _mockNoteRepository.Setup(r => r.GetAsync(noteId))
-                .ReturnsAsync(note);
-
-            // Act
-            var result = await _noteService.GetNoteById(userId, noteId);
-
-            // Assert
             Assert.Null(result);
         }
 
         [Fact]
         public async Task CreateNote_ReturnsValidationErrors_WhenValidationFails()
         {
-            // Arrange
             var userId = "user1";
             var noteDto = new NoteCreateDto { Name = "Test", Description = "Test", Tags = new List<string>() };
             var validationErrors = new List<ValidationFailure> { new ValidationFailure("Name", "Name is required") };
-
-            _mockCreateValidator.Setup(v => v.ValidateAsync(noteDto, default))
-                .ReturnsAsync(new ValidationResult(validationErrors));
-
-            // Act
+            _mockCreateValidator.Setup(v => v.ValidateAsync(noteDto, default)).ReturnsAsync(new ValidationResult(validationErrors));
             var result = await _noteService.CreateNote(userId, noteDto, null);
             var (note, errors) = result;
-
-            // Assert
             Assert.Null(note);
             Assert.Single(errors);
             Assert.Contains("Name is required", errors);
@@ -153,106 +109,82 @@ namespace NotesSolution.Tests.Services
         [Fact]
         public async Task CreateNote_CreatesNoteSuccessfully_WhenValidationPasses()
         {
-            // Arrange
             var userId = "user1";
             var noteDto = new NoteCreateDto { Name = "Test", Description = "Test", Tags = new List<string> { "tag1" } };
             var note = new Note { Id = Guid.NewGuid(), Name = "Test", UserId = userId };
             var createdNoteDto = new NoteDto { Id = note.Id, Name = "Test" };
-
-            _mockCreateValidator.Setup(v => v.ValidateAsync(noteDto, default))
-                .ReturnsAsync(new ValidationResult());
-            _mockTagRepository.Setup(r => r.GetByNameAsync("tag1"))
-                .ReturnsAsync((Tag?)null);
-            _mockMapper.Setup(m => m.Map<Note>(noteDto))
-                .Returns(note);
-            _mockMapper.Setup(m => m.Map<NoteDto>(note))
-                .Returns(createdNoteDto);
-
-            // Act
+            _mockCreateValidator.Setup(v => v.ValidateAsync(noteDto, default)).ReturnsAsync(new ValidationResult());
+            _mockTagHelperService.Setup(s => s.GetOrCreateTagsAsync(noteDto.Tags, userId)).ReturnsAsync(new List<Tag>());
+            _mockMapper.Setup(m => m.Map<Note>(noteDto)).Returns(note);
+            _mockMapper.Setup(m => m.Map<NoteDto>(note)).Returns(createdNoteDto);
+            _mockNoteRepository.Setup(r => r.CreateAsync(note)).Returns(Task.CompletedTask);
             var result = await _noteService.CreateNote(userId, noteDto, null);
             var (createdNote, errors) = result;
-
-            // Assert
             Assert.NotNull(createdNote);
             Assert.Empty(errors);
             _mockNoteRepository.Verify(r => r.CreateAsync(It.IsAny<Note>()), Times.Once);
-            _mockNoteRepository.Verify(r => r.SaveAsync(), Times.Once);
         }
 
         [Fact]
         public async Task UpdateNote_ReturnsNotFound_WhenNoteDoesNotExist()
         {
-            // Arrange
             var userId = "user1";
             var noteId = Guid.NewGuid();
             var noteDto = new NoteUpdateDto { Name = "Updated", Description = "Updated", Tags = new List<string>() };
-
-            _mockUpdateValidator.Setup(v => v.ValidateAsync(noteDto, default))
-                .ReturnsAsync(new ValidationResult());
-            _mockNoteRepository.Setup(r => r.GetAsync(noteId))
-                .ReturnsAsync((Note?)null);
-
-            // Act
+            _mockUpdateValidator.Setup(v => v.ValidateAsync(noteDto, default)).ReturnsAsync(new ValidationResult());
+            _mockNoteRepository.Setup(r => r.GetAsync(userId, noteId)).ReturnsAsync((Note?)null);
             var result = await _noteService.UpdateNote(userId, noteId, noteDto, null);
             var (updatedNote, errors, notFound) = result;
-
-            // Assert
             Assert.Null(updatedNote);
             Assert.True(notFound);
         }
 
         [Fact]
-        public async Task DeleteNote_ReturnsTrue_WhenNoteExistsAndOwnedByUser()
+        public async Task UpdateNote_UpdatesNoteSuccessfully_WhenValidationPassesAndNoteExists()
         {
-            // Arrange
             var userId = "user1";
             var noteId = Guid.NewGuid();
-            var note = new Note { Id = noteId, Name = "Test Note", UserId = userId };
+            var noteDto = new NoteUpdateDto { Name = "Updated", Description = "Updated", Tags = new List<string> { "tag1" } };
+            var note = new Note { Id = noteId, Name = "Old", UserId = userId, Tags = new List<Tag>() };
+            var updatedNoteDto = new NoteDto { Id = noteId, Name = "Updated" };
+            _mockUpdateValidator.Setup(v => v.ValidateAsync(noteDto, default)).ReturnsAsync(new ValidationResult());
+            _mockNoteRepository.Setup(r => r.GetAsync(userId, noteId)).ReturnsAsync(note);
+            _mockTagHelperService.Setup(s => s.GetOrCreateTagsAsync(noteDto.Tags, userId)).ReturnsAsync(new List<Tag>());
+            _mockMapper.Setup(m => m.Map(noteDto, note)).Verifiable();
+            _mockNoteRepository.Setup(r => r.UpdateAsync(note)).Returns(Task.CompletedTask);
+            _mockNoteRepository.Setup(r => r.SaveAsync()).Returns(Task.CompletedTask);
+            _mockMapper.Setup(m => m.Map<NoteDto>(note)).Returns(updatedNoteDto);
+            var result = await _noteService.UpdateNote(userId, noteId, noteDto, null);
+            var (updatedNote, errors, notFound) = result;
+            Assert.NotNull(updatedNote);
+            Assert.Empty(errors);
+            Assert.False(notFound);
+            _mockNoteRepository.Verify(r => r.UpdateAsync(note), Times.Once);
+            _mockNoteRepository.Verify(r => r.SaveAsync(), Times.Once);
+        }
 
-            _mockNoteRepository.Setup(r => r.GetAsync(noteId))
-                .ReturnsAsync(note);
-
-            // Act
+        [Fact]
+        public async Task DeleteNote_ReturnsTrue_WhenNoteExistsAndOwnedByUser()
+        {
+            var userId = "user1";
+            var noteId = Guid.NewGuid();
+            var note = new Note { Id = noteId, Name = "Test Note", UserId = userId, ImageUrls = new List<string> { "/images/img1.png" } };
+            _mockNoteRepository.Setup(r => r.GetAsync(userId, noteId)).ReturnsAsync(note);
+            _mockNoteRepository.Setup(r => r.RemoveAsync(note)).Returns(Task.CompletedTask);
+            _mockImageService.Setup(s => s.DeleteImage(It.IsAny<string>())).Returns(true);
             var result = await _noteService.DeleteNote(userId, noteId);
-
-            // Assert
             Assert.True(result);
             _mockNoteRepository.Verify(r => r.RemoveAsync(note), Times.Once);
+            _mockImageService.Verify(s => s.DeleteImage(It.IsAny<string>()), Times.AtLeastOnce);
         }
 
         [Fact]
         public async Task DeleteNote_ReturnsFalse_WhenNoteDoesNotExist()
         {
-            // Arrange
             var userId = "user1";
             var noteId = Guid.NewGuid();
-
-            _mockNoteRepository.Setup(r => r.GetAsync(noteId))
-                .ReturnsAsync((Note?)null);
-
-            // Act
+            _mockNoteRepository.Setup(r => r.GetAsync(userId, noteId)).ReturnsAsync((Note?)null);
             var result = await _noteService.DeleteNote(userId, noteId);
-
-            // Assert
-            Assert.False(result);
-            _mockNoteRepository.Verify(r => r.RemoveAsync(It.IsAny<Note>()), Times.Never);
-        }
-
-        [Fact]
-        public async Task DeleteNote_ReturnsFalse_WhenNoteNotOwnedByUser()
-        {
-            // Arrange
-            var userId = "user1";
-            var noteId = Guid.NewGuid();
-            var note = new Note { Id = noteId, Name = "Test Note", UserId = "user2" };
-
-            _mockNoteRepository.Setup(r => r.GetAsync(noteId))
-                .ReturnsAsync(note);
-
-            // Act
-            var result = await _noteService.DeleteNote(userId, noteId);
-
-            // Assert
             Assert.False(result);
             _mockNoteRepository.Verify(r => r.RemoveAsync(It.IsAny<Note>()), Times.Never);
         }

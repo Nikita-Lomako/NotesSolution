@@ -46,47 +46,29 @@ namespace NotesSolution.Tests.Services
         [Fact]
         public async Task GetAllTags_ReturnsFilteredTagsForUser()
         {
-            // Arrange
             var userId = "user1";
             var tags = new List<Tag>
             {
                 new Tag { Id = Guid.NewGuid(), Name = "Tag1", UserId = userId },
-                new Tag { Id = Guid.NewGuid(), Name = "Tag2", UserId = userId },
-                new Tag { Id = Guid.NewGuid(), Name = "Tag3", UserId = "user2" }
+                new Tag { Id = Guid.NewGuid(), Name = "Tag2", UserId = userId }
             };
-            var tagDtos = tags.Where(t => t.UserId == userId).Select(t => new TagDto { Id = t.Id, Name = t.Name }).ToList();
-
-            _mockTagRepository.Setup(r => r.GetAllAsync())
-                .ReturnsAsync(tags);
-            _mockMapper.Setup(m => m.Map<List<TagDto>>(It.IsAny<List<Tag>>()))
-                .Returns(tagDtos);
-
-            // Act
+            var tagDtos = tags.Select(t => new TagDto { Id = t.Id, Name = t.Name }).ToList();
+            _mockTagRepository.Setup(r => r.GetAllAsync(userId)).ReturnsAsync(tags);
+            _mockMapper.Setup(m => m.Map<List<TagDto>>(tags)).Returns(tagDtos);
             var result = await _tagService.GetAllTags(userId);
-
-            // Assert
             Assert.Equal(2, result.Count);
-            Assert.All(result, dto => Assert.Equal(userId, tags.First(t => t.Id == dto.Id).UserId));
         }
 
         [Fact]
         public async Task GetTagById_ReturnsTag_WhenTagExistsAndOwnedByUser()
         {
-            // Arrange
             var userId = "user1";
             var tagId = Guid.NewGuid();
             var tag = new Tag { Id = tagId, Name = "Test Tag", UserId = userId };
             var tagDto = new TagDto { Id = tagId, Name = "Test Tag" };
-
-            _mockTagRepository.Setup(r => r.GetAsync(tagId))
-                .ReturnsAsync(tag);
-            _mockMapper.Setup(m => m.Map<TagDto>(tag))
-                .Returns(tagDto);
-
-            // Act
+            _mockTagRepository.Setup(r => r.GetAsync(userId, tagId)).ReturnsAsync(tag);
+            _mockMapper.Setup(m => m.Map<TagDto>(tag)).Returns(tagDto);
             var result = await _tagService.GetTagById(userId, tagId);
-
-            // Assert
             Assert.NotNull(result);
             Assert.Equal(tagId, result.Id);
         }
@@ -94,56 +76,23 @@ namespace NotesSolution.Tests.Services
         [Fact]
         public async Task GetTagById_ReturnsNull_WhenTagDoesNotExist()
         {
-            // Arrange
             var userId = "user1";
             var tagId = Guid.NewGuid();
-
-            _mockTagRepository.Setup(r => r.GetAsync(tagId))
-                .ReturnsAsync((Tag?)null);
-
-            // Act
+            _mockTagRepository.Setup(r => r.GetAsync(userId, tagId)).ReturnsAsync((Tag?)null);
             var result = await _tagService.GetTagById(userId, tagId);
-
-            // Assert
-            Assert.Null(result);
-        }
-
-        [Fact]
-        public async Task GetTagById_ReturnsNull_WhenTagNotOwnedByUser()
-        {
-            // Arrange
-            var userId = "user1";
-            var tagId = Guid.NewGuid();
-            var tag = new Tag { Id = tagId, Name = "Test Tag", UserId = "user2" };
-
-            _mockTagRepository.Setup(r => r.GetAsync(tagId))
-                .ReturnsAsync(tag);
-
-            // Act
-            var result = await _tagService.GetTagById(userId, tagId);
-
-            // Assert
             Assert.Null(result);
         }
 
         [Fact]
         public async Task GetTagByName_ReturnsTag_WhenTagExistsAndOwnedByUser()
         {
-            // Arrange
             var userId = "user1";
             var tagName = "TestTag";
             var tag = new Tag { Id = Guid.NewGuid(), Name = tagName, UserId = userId };
             var tagDto = new TagDto { Id = tag.Id, Name = tagName };
-
-            _mockTagRepository.Setup(r => r.GetByNameAsync(tagName))
-                .ReturnsAsync(tag);
-            _mockMapper.Setup(m => m.Map<TagDto>(tag))
-                .Returns(tagDto);
-
-            // Act
+            _mockTagRepository.Setup(r => r.GetByNameAsync(userId, tagName)).ReturnsAsync(tag);
+            _mockMapper.Setup(m => m.Map<TagDto>(tag)).Returns(tagDto);
             var result = await _tagService.GetTagByName(userId, tagName);
-
-            // Assert
             Assert.NotNull(result);
             Assert.Equal(tagName, result.Name);
         }
@@ -151,19 +100,12 @@ namespace NotesSolution.Tests.Services
         [Fact]
         public async Task CreateTag_ReturnsValidationErrors_WhenValidationFails()
         {
-            // Arrange
             var userId = "user1";
             var tagDto = new TagRequestDto { Name = "Test" };
             var validationErrors = new List<ValidationFailure> { new ValidationFailure("Name", "Name is required") };
-
-            _mockValidator.Setup(v => v.ValidateAsync(tagDto, default))
-                .ReturnsAsync(new ValidationResult(validationErrors));
-
-            // Act
+            _mockValidator.Setup(v => v.ValidateAsync(tagDto, default)).ReturnsAsync(new ValidationResult(validationErrors));
             var result = await _tagService.CreateTag(userId, tagDto);
             var (tag, errors, conflict) = result;
-
-            // Assert
             Assert.Null(tag);
             Assert.Single(errors);
             Assert.Contains("Name is required", errors);
@@ -173,21 +115,13 @@ namespace NotesSolution.Tests.Services
         [Fact]
         public async Task CreateTag_ReturnsConflict_WhenTagAlreadyExistsForUser()
         {
-            // Arrange
             var userId = "user1";
             var tagDto = new TagRequestDto { Name = "ExistingTag" };
             var existingTag = new Tag { Id = Guid.NewGuid(), Name = "ExistingTag", UserId = userId };
-
-            _mockValidator.Setup(v => v.ValidateAsync(tagDto, default))
-                .ReturnsAsync(new ValidationResult());
-            _mockTagRepository.Setup(r => r.GetByNameAsync("ExistingTag"))
-                .ReturnsAsync(existingTag);
-
-            // Act
+            _mockValidator.Setup(v => v.ValidateAsync(tagDto, default)).ReturnsAsync(new ValidationResult());
+            _mockTagRepository.Setup(r => r.GetByNameAsync(userId, "ExistingTag")).ReturnsAsync(existingTag);
             var result = await _tagService.CreateTag(userId, tagDto);
             var (createdTag, errors, conflict) = result;
-
-            // Assert
             Assert.Null(createdTag);
             Assert.Empty(errors);
             Assert.True(conflict);
@@ -196,49 +130,32 @@ namespace NotesSolution.Tests.Services
         [Fact]
         public async Task CreateTag_CreatesTagSuccessfully_WhenValidationPassesAndTagDoesNotExist()
         {
-            // Arrange
             var userId = "user1";
             var tagDto = new TagRequestDto { Name = "NewTag" };
             var tag = new Tag { Id = Guid.NewGuid(), Name = "NewTag", UserId = userId };
             var createdTagDto = new TagDto { Id = tag.Id, Name = "NewTag" };
-
-            _mockValidator.Setup(v => v.ValidateAsync(tagDto, default))
-                .ReturnsAsync(new ValidationResult());
-            _mockTagRepository.Setup(r => r.GetByNameAsync("NewTag"))
-                .ReturnsAsync((Tag?)null);
-            _mockMapper.Setup(m => m.Map<TagDto>(It.IsAny<Tag>()))
-                .Returns(createdTagDto);
-
-            // Act
+            _mockValidator.Setup(v => v.ValidateAsync(tagDto, default)).ReturnsAsync(new ValidationResult());
+            _mockTagRepository.Setup(r => r.GetByNameAsync(userId, "NewTag")).ReturnsAsync((Tag?)null);
+            _mockTagRepository.Setup(r => r.CreateAsync(It.IsAny<Tag>())).Returns(Task.CompletedTask);
+            _mockMapper.Setup(m => m.Map<TagDto>(It.IsAny<Tag>())).Returns(createdTagDto);
             var result = await _tagService.CreateTag(userId, tagDto);
             var (createdTag, errors, conflict) = result;
-
-            // Assert
             Assert.NotNull(createdTag);
             Assert.Empty(errors);
             Assert.False(conflict);
             _mockTagRepository.Verify(r => r.CreateAsync(It.IsAny<Tag>()), Times.Once);
-            _mockTagRepository.Verify(r => r.SaveAsync(), Times.Once);
         }
 
         [Fact]
         public async Task UpdateTag_ReturnsNotFound_WhenTagDoesNotExist()
         {
-            // Arrange
             var userId = "user1";
             var tagId = Guid.NewGuid();
             var tagDto = new TagRequestDto { Name = "UpdatedTag" };
-
-            _mockValidator.Setup(v => v.ValidateAsync(tagDto, default))
-                .ReturnsAsync(new ValidationResult());
-            _mockTagRepository.Setup(r => r.GetAsync(tagId))
-                .ReturnsAsync((Tag?)null);
-
-            // Act
+            _mockValidator.Setup(v => v.ValidateAsync(tagDto, default)).ReturnsAsync(new ValidationResult());
+            _mockTagRepository.Setup(r => r.GetAsync(userId, tagId)).ReturnsAsync((Tag?)null);
             var result = await _tagService.UpdateTag(userId, tagId, tagDto);
             var (updatedTag, errors, notFound, conflict) = result;
-
-            // Assert
             Assert.Null(updatedTag);
             Assert.True(notFound);
             Assert.False(conflict);
@@ -247,25 +164,16 @@ namespace NotesSolution.Tests.Services
         [Fact]
         public async Task UpdateTag_ReturnsConflict_WhenTagWithSameNameExistsForUser()
         {
-            // Arrange
             var userId = "user1";
             var tagId = Guid.NewGuid();
-            var tagDto = new TagRequestDto { Name = "ExistingTag" };
-            var existingTag = new Tag { Id = tagId, Name = "OldName", UserId = userId };
-            var conflictingTag = new Tag { Id = Guid.NewGuid(), Name = "ExistingTag", UserId = userId };
-
-            _mockValidator.Setup(v => v.ValidateAsync(tagDto, default))
-                .ReturnsAsync(new ValidationResult());
-            _mockTagRepository.Setup(r => r.GetAsync(tagId))
-                .ReturnsAsync(existingTag);
-            _mockTagRepository.Setup(r => r.GetByNameAsync("ExistingTag"))
-                .ReturnsAsync(conflictingTag);
-
-            // Act
+            var tagDto = new TagRequestDto { Name = "UpdatedTag" };
+            var existingTag = new Tag { Id = tagId, Name = "OldTag", UserId = userId };
+            var tagWithSameName = new Tag { Id = Guid.NewGuid(), Name = "UpdatedTag", UserId = userId };
+            _mockValidator.Setup(v => v.ValidateAsync(tagDto, default)).ReturnsAsync(new ValidationResult());
+            _mockTagRepository.Setup(r => r.GetAsync(userId, tagId)).ReturnsAsync(existingTag);
+            _mockTagRepository.Setup(r => r.GetByNameAsync(userId, "UpdatedTag")).ReturnsAsync(tagWithSameName);
             var result = await _tagService.UpdateTag(userId, tagId, tagDto);
             var (updatedTag, errors, notFound, conflict) = result;
-
-            // Assert
             Assert.Null(updatedTag);
             Assert.False(notFound);
             Assert.True(conflict);
@@ -274,94 +182,45 @@ namespace NotesSolution.Tests.Services
         [Fact]
         public async Task UpdateTag_UpdatesTagSuccessfully_WhenValidationPassesAndNoConflicts()
         {
-            // Arrange
             var userId = "user1";
             var tagId = Guid.NewGuid();
             var tagDto = new TagRequestDto { Name = "UpdatedTag" };
-            var existingTag = new Tag { Id = tagId, Name = "OldName", UserId = userId };
-            var updatedTagDto = new TagDto { Id = tagId, Name = "UpdatedTag" };
-
-            _mockValidator.Setup(v => v.ValidateAsync(tagDto, default))
-                .ReturnsAsync(new ValidationResult());
-            _mockTagRepository.Setup(r => r.GetAsync(tagId))
-                .ReturnsAsync(existingTag);
-            _mockTagRepository.Setup(r => r.GetByNameAsync("UpdatedTag"))
-                .ReturnsAsync((Tag?)null);
-            _mockMapper.Setup(m => m.Map<TagDto>(It.IsAny<Tag>()))
-                .Returns(updatedTagDto);
-
-            // Act
+            var existingTag = new Tag { Id = tagId, Name = "OldTag", UserId = userId };
+            _mockValidator.Setup(v => v.ValidateAsync(tagDto, default)).ReturnsAsync(new ValidationResult());
+            _mockTagRepository.Setup(r => r.GetAsync(userId, tagId)).ReturnsAsync(existingTag);
+            _mockTagRepository.Setup(r => r.GetByNameAsync(userId, "UpdatedTag")).ReturnsAsync((Tag?)null);
+            _mockTagRepository.Setup(r => r.UpdateAsync(existingTag)).Returns(Task.CompletedTask);
+            _mockMapper.Setup(m => m.Map<TagDto>(existingTag)).Returns(new TagDto { Id = tagId, Name = "UpdatedTag" });
             var result = await _tagService.UpdateTag(userId, tagId, tagDto);
             var (updatedTag, errors, notFound, conflict) = result;
-
-            // Assert
             Assert.NotNull(updatedTag);
             Assert.Empty(errors);
             Assert.False(notFound);
             Assert.False(conflict);
-            _mockTagRepository.Verify(r => r.UpdateAsync(It.IsAny<Tag>()), Times.Once);
-            _mockTagRepository.Verify(r => r.SaveAsync(), Times.Once);
+            _mockTagRepository.Verify(r => r.UpdateAsync(existingTag), Times.Once);
         }
 
         [Fact]
         public async Task DeleteTag_ReturnsTrue_WhenTagExistsAndOwnedByUser()
         {
-            // Arrange
             var userId = "user1";
             var tagId = Guid.NewGuid();
             var tag = new Tag { Id = tagId, Name = "Test Tag", UserId = userId };
-            var notes = new List<Note>
-            {
-                new Note { Id = Guid.NewGuid(), Name = "Note1", UserId = userId, Tags = new List<Tag> { tag } }
-            };
-
-            _mockTagRepository.Setup(r => r.GetAsync(tagId))
-                .ReturnsAsync(tag);
-            _mockNoteRepository.Setup(r => r.GetAllAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>()))
-                .ReturnsAsync(notes);
-
-            // Act
+            _mockTagRepository.Setup(r => r.GetAsync(userId, tagId)).ReturnsAsync(tag);
+            _mockTagRepository.Setup(r => r.RemoveAsync(tag)).Returns(Task.CompletedTask);
+            _mockNoteRepository.Setup(r => r.GetAllAsync(userId, null, null, null, null, 1, int.MaxValue)).ReturnsAsync(new List<Note>());
             var result = await _tagService.DeleteTag(userId, tagId);
-
-            // Assert
             Assert.True(result);
             _mockTagRepository.Verify(r => r.RemoveAsync(tag), Times.Once);
-            _mockTagRepository.Verify(r => r.SaveAsync(), Times.Once);
         }
 
         [Fact]
         public async Task DeleteTag_ReturnsFalse_WhenTagDoesNotExist()
         {
-            // Arrange
             var userId = "user1";
             var tagId = Guid.NewGuid();
-
-            _mockTagRepository.Setup(r => r.GetAsync(tagId))
-                .ReturnsAsync((Tag?)null);
-
-            // Act
+            _mockTagRepository.Setup(r => r.GetAsync(userId, tagId)).ReturnsAsync((Tag?)null);
             var result = await _tagService.DeleteTag(userId, tagId);
-
-            // Assert
-            Assert.False(result);
-            _mockTagRepository.Verify(r => r.RemoveAsync(It.IsAny<Tag>()), Times.Never);
-        }
-
-        [Fact]
-        public async Task DeleteTag_ReturnsFalse_WhenTagNotOwnedByUser()
-        {
-            // Arrange
-            var userId = "user1";
-            var tagId = Guid.NewGuid();
-            var tag = new Tag { Id = tagId, Name = "Test Tag", UserId = "user2" };
-
-            _mockTagRepository.Setup(r => r.GetAsync(tagId))
-                .ReturnsAsync(tag);
-
-            // Act
-            var result = await _tagService.DeleteTag(userId, tagId);
-
-            // Assert
             Assert.False(result);
             _mockTagRepository.Verify(r => r.RemoveAsync(It.IsAny<Tag>()), Times.Never);
         }

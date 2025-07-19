@@ -36,7 +36,7 @@ namespace NotesSolution.API.Endpoints
             [FromServices] ITagService tagService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
-            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+            var userId = httpContextAccessor.HttpContext?.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
             var tags = await tagService.GetAllTags(userId);
             return Results.Ok(tags);
         }
@@ -46,13 +46,13 @@ namespace NotesSolution.API.Endpoints
             [FromServices] ITagService tagService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
-            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+            var userId = httpContextAccessor.HttpContext?.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
             var (createdTag, errors, conflict) = await tagService.CreateTag(userId, tagDto);
             if (conflict)
                 return Results.Conflict($"Tag with name '{tagDto.Name}' already exists.");
             if (errors.Count > 0)
                 return Results.BadRequest(errors);
-            return Results.Created($"/api/tags/{createdTag.Id}", createdTag);
+            return Results.Created($"/api/tags/{createdTag?.Id}", createdTag);
         }
 
         private static async Task<IResult> UpdateTag(
@@ -61,7 +61,7 @@ namespace NotesSolution.API.Endpoints
             [FromServices] ITagService tagService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
-            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+            var userId = httpContextAccessor.HttpContext?.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
             var (updatedTag, errors, notFound, conflict) = await tagService.UpdateTag(userId, id, tagDto);
             if (notFound)
                 return Results.NotFound();
@@ -77,7 +77,7 @@ namespace NotesSolution.API.Endpoints
             [FromServices] ITagService tagService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
-            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+            var userId = httpContextAccessor.HttpContext?.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
             var deleted = await tagService.DeleteTag(userId, id);
             if (!deleted)
                 return Results.NotFound();
@@ -89,7 +89,7 @@ namespace NotesSolution.API.Endpoints
             [FromServices] ITagService tagService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
-            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+            var userId = httpContextAccessor.HttpContext?.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
             var tag = await tagService.GetTagById(userId, id);
             if (tag == null)
                 return Results.NotFound();
@@ -101,7 +101,7 @@ namespace NotesSolution.API.Endpoints
             [FromServices] ITagService tagService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
-            var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+            var userId = httpContextAccessor.HttpContext?.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
             var tag = await tagService.GetTagByName(userId, name);
             if (tag == null)
                 return Results.NotFound();

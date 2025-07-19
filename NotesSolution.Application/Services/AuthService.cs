@@ -14,11 +14,13 @@ namespace NotesSolution.Application.Services
     {
         private readonly IAuthRepository _authRepository;
         private readonly IConfiguration _configuration;
+        private readonly IJwtService _jwtService;
 
-        public AuthService(IAuthRepository authRepository, IConfiguration configuration)
+        public AuthService(IAuthRepository authRepository, IConfiguration configuration, IJwtService jwtService)
         {
             _authRepository = authRepository;
             _configuration = configuration;
+            _jwtService = jwtService;
         }
 
         public async Task<LoginResponseDto?> LoginAsync(LoginRequestDto loginRequestDto)
@@ -34,19 +36,11 @@ namespace NotesSolution.Application.Services
             };
 
             // JWT Token
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(_configuration["ApiSettings:Secret"] ?? throw new ArgumentNullException("Secret key is missing"));
-            var tokenDescriptor = new SecurityTokenDescriptor
-            {
-                Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddDays(7),
-                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
-            };
-            var token = tokenHandler.CreateToken(tokenDescriptor);
+            var token = _jwtService.GenerateToken(claims);
 
             return new LoginResponseDto
             {
-                Token = tokenHandler.WriteToken(token),
+                Token = token,
                 UserName = user.UserName ?? ""
             };
         }

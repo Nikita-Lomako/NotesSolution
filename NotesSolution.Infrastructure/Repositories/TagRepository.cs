@@ -14,19 +14,19 @@ namespace NotesSolution.Infrastructure.Repositories
             _db = db;
         }
 
-        public async Task<ICollection<Tag>> GetAllAsync()
+        public async Task<ICollection<Tag>> GetAllAsync(string userId)
         {
-            return await _db.Tags.ToListAsync();
+            return await _db.Tags.Where(t => t.UserId == userId).ToListAsync();
         }
 
-        public async Task<Tag?> GetAsync(Guid id)
+        public async Task<Tag?> GetAsync(string userId, Guid id)
         {
-            return await _db.Tags.FirstOrDefaultAsync(t => t.Id == id);
+            return await _db.Tags.FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId);
         }
 
-        public async Task<Tag?> GetByNameAsync(string name)
+        public async Task<Tag?> GetByNameAsync(string userId, string name)
         {
-            return await _db.Tags.FirstOrDefaultAsync(t => t.Name.ToLower() == name.ToLower());
+            return await _db.Tags.FirstOrDefaultAsync(t => t.Name.ToLower() == name.ToLower() && t.UserId == userId);
         }
 
         public async Task CreateAsync(Tag tag)

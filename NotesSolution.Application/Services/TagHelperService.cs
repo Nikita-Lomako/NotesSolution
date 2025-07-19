@@ -19,7 +19,7 @@ namespace NotesSolution.Application.Services
             var tagEntities = new List<Tag>();
             foreach (var tagName in tagNames)
             {
-                var existingTag = await _tagRepository.GetByNameAsync(tagName);
+                var existingTag = await _tagRepository.GetByNameAsync(userId, tagName);
                 if (existingTag != null && existingTag.UserId == userId)
                 {
                     tagEntities.Add(existingTag);

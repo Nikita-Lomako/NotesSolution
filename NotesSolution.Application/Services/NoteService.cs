@@ -48,16 +48,14 @@ namespace NotesSolution.Application.Services
         public async Task<List<NoteDto>> GetAllNotes(string userId, string? search, string? tag, string? sort, string? order, int page, int pageSize)
         {
             _logger.LogInformation("Getting all notes for user {UserId} with search={Search}, tag={Tag}, sort={Sort}, order={Order}, page={Page}, pageSize={PageSize}", userId, search, tag, sort, order, page, pageSize);
-            var notes = await _noteRepository.GetAllAsync(search, tag, sort, order, page, pageSize);
-            notes = notes.Where(n => n.UserId == userId).ToList();
+            var notes = await _noteRepository.GetAllAsync(userId, search, tag, sort, order, page, pageSize);
             _logger.LogInformation("Found {Count} notes for user {UserId}", notes.Count, userId);
             return _mapper.Map<List<NoteDto>>(notes);
         }
 
         private async Task<Note?> GetUserNoteByIdAsync(string userId, Guid id)
         {
-            var note = await _noteRepository.GetAsync(id);
-            return note != null && note.UserId == userId ? note : null;
+            return await _noteRepository.GetAsync(userId, id);
         }
 
         public async Task<NoteDto?> GetNoteById(string userId, Guid id)
@@ -147,7 +145,7 @@ namespace NotesSolution.Application.Services
                     if (!imageHashes.Contains(hash))
                     {
                         var imageUrl = await _imageService.SaveImageAsync(image);
-                        existingNote.ImageUrls.Add(imageUrl);
+                        existingNote.ImageUrls?.Add(imageUrl);
                         imageHashes.Add(hash);
                     }
                 }
