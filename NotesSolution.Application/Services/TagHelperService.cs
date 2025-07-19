@@ -4,7 +4,7 @@ using NotesSolution.Core.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace NotesSolution.Core.Services
+namespace NotesSolution.Application.Services
 {
     public class TagHelperService : ITagHelperService
     {

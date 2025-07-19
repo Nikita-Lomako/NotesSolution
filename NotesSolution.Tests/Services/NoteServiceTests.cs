@@ -3,11 +3,11 @@ using FluentValidation;
 using FluentValidation.Results;
 using Microsoft.Extensions.Logging;
 using Moq;
-using NotesSolution.Core.Dtos;
 using NotesSolution.Core.Interfaces.IRepositories;
 using NotesSolution.Core.Interfaces;
 using NotesSolution.Core.Models;
-using NotesSolution.API.Services;
+using NotesSolution.Application.Dtos;
+using NotesSolution.Application.Services;
 
 namespace NotesSolution.Tests.Services
 {
@@ -21,7 +21,7 @@ namespace NotesSolution.Tests.Services
         private readonly Mock<IValidator<NoteUpdateDto>> _mockUpdateValidator;
         private readonly Mock<ILogger<NoteService>> _mockLogger;
         private readonly Mock<ITagHelperService> _mockTagHelperService;
-        private readonly NoteService _noteService;
+        private readonly INoteService _noteService;
 
         public NoteServiceTests()
         {
@@ -43,7 +43,6 @@ namespace NotesSolution.Tests.Services
                 _mockUpdateValidator.Object,
                 _mockLogger.Object,
                 _mockTagHelperService.Object
-
             );
         }
 

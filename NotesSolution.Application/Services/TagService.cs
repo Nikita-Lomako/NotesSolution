@@ -1,17 +1,18 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using NotesSolution.Core.Dtos;
+using NotesSolution.Application.Dtos;
 using NotesSolution.Core.Interfaces.IRepositories;
 using NotesSolution.Core.Models;
 using AutoMapper;
 using FluentValidation;
 using Microsoft.Extensions.Logging;
+using NotesSolution.Application.Interfaces;
 
-namespace NotesSolution.API.Services
+namespace NotesSolution.Application.Services
 {
-    public class TagService
+    public class TagService : ITagService
     {
         private readonly ITagRepository _tagRepository;
         private readonly INoteRepository _noteRepository;
@@ -85,7 +86,6 @@ namespace NotesSolution.API.Services
             }
             var tag = new Tag { Name = tagDto.Name, UserId = userId };
             await _tagRepository.CreateAsync(tag);
-            await _tagRepository.SaveAsync();
             _logger.LogInformation("Created new tag with id {Id} for user {UserId}", tag.Id, userId);
             return (_mapper.Map<TagDto>(tag), new List<string>(), false);
         }
@@ -113,7 +113,6 @@ namespace NotesSolution.API.Services
             }
             existingTag.Name = tagDto.Name;
             await _tagRepository.UpdateAsync(existingTag);
-            await _tagRepository.SaveAsync();
             _logger.LogInformation("Updated tag with id {Id} for user {UserId}", id, userId);
             return (_mapper.Map<TagDto>(existingTag), new List<string>(), false, false);
         }
@@ -129,7 +128,6 @@ namespace NotesSolution.API.Services
             }
             await RemoveTagFromAllUserNotesAsync(userId, id);
             await _tagRepository.RemoveAsync(tag);
-            await _tagRepository.SaveAsync();
             _logger.LogInformation("Deleted tag with id {Id} for user {UserId}", id, userId);
             return true;
         }
@@ -156,4 +154,4 @@ namespace NotesSolution.API.Services
             }
         }
     }
-}
+} 

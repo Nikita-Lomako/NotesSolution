@@ -16,32 +16,39 @@ namespace NotesSolution.Infrastructure.Repositories
 
         public async Task<ICollection<Tag>> GetAllAsync()
         {
-            return await _db.Tags.AsNoTracking().ToListAsync();
+            return await _db.Tags.ToListAsync();
         }
 
         public async Task<Tag?> GetAsync(Guid id)
         {
-            return await _db.Tags.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id);
+            return await _db.Tags.FirstOrDefaultAsync(t => t.Id == id);
         }
 
         public async Task<Tag?> GetByNameAsync(string name)
         {
-            return await _db.Tags.AsNoTracking().FirstOrDefaultAsync(t => t.Name.ToLower() == name.ToLower());
+            return await _db.Tags.FirstOrDefaultAsync(t => t.Name.ToLower() == name.ToLower());
         }
 
         public async Task CreateAsync(Tag tag)
         {
             await _db.Tags.AddAsync(tag);
+            await SaveAsync();
         }
 
         public async Task UpdateAsync(Tag tag)
         {
             _db.Tags.Update(tag);
+            await SaveAsync();
         }
 
         public async Task RemoveAsync(Tag tag)
         {
-            _db.Tags.Remove(tag);
+            var tracked = await _db.Tags.FindAsync(tag.Id);
+            if (tracked != null)
+            {
+                _db.Tags.Remove(tracked);
+                await SaveAsync();
+            }
         }
 
         public async Task SaveAsync()

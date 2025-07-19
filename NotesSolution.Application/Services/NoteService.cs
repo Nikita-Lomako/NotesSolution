@@ -1,19 +1,20 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
-using NotesSolution.Core.Dtos;
+using NotesSolution.Application.Dtos;
 using NotesSolution.Core.Interfaces.IRepositories;
 using NotesSolution.Core.Models;
 using NotesSolution.Core.Interfaces;
 using AutoMapper;
 using FluentValidation;
 using Microsoft.Extensions.Logging;
+using NotesSolution.Application.Interfaces;
 
-namespace NotesSolution.API.Services
+namespace NotesSolution.Application.Services
 {
-    public class NoteService
+    public class NoteService : INoteService
     {
         private readonly INoteRepository _noteRepository;
         private readonly ITagRepository _tagRepository;
@@ -105,7 +106,6 @@ namespace NotesSolution.API.Services
                 }
             }
             await _noteRepository.CreateAsync(note);
-            await _noteRepository.SaveAsync();
             _logger.LogInformation("Created new note with id {Id} for user {UserId}", note.Id, userId);
             return (_mapper.Map<NoteDto>(note), new List<string>());
         }
@@ -175,6 +175,6 @@ namespace NotesSolution.API.Services
             }
             _logger.LogInformation("Note with id {Id} deleted for user {UserId}", id, userId);
             return true;
-        }
+        }       
     }
-}
+} 

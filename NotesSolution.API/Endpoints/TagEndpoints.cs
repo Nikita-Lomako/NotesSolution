@@ -1,12 +1,13 @@
 using AutoMapper;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
-using NotesSolution.Core.Dtos;
 using NotesSolution.Core.Interfaces.IRepositories;
 using NotesSolution.Core.Models;
 using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
-using NotesSolution.API.Services;
+using NotesSolution.Application.Dtos;
+using NotesSolution.Core.Interfaces;
+using NotesSolution.Application.Interfaces;
 
 namespace NotesSolution.API.Endpoints
 {
@@ -32,7 +33,7 @@ namespace NotesSolution.API.Endpoints
         }
 
         private static async Task<IResult> GetAllTags(
-            [FromServices] TagService tagService,
+            [FromServices] ITagService tagService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
             var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
@@ -42,7 +43,7 @@ namespace NotesSolution.API.Endpoints
 
         private static async Task<IResult> CreateTag(
             TagRequestDto tagDto,
-            [FromServices] TagService tagService,
+            [FromServices] ITagService tagService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
             var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
@@ -57,7 +58,7 @@ namespace NotesSolution.API.Endpoints
         private static async Task<IResult> UpdateTag(
             Guid id,
             TagRequestDto tagDto,
-            [FromServices] TagService tagService,
+            [FromServices] ITagService tagService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
             var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
@@ -73,7 +74,7 @@ namespace NotesSolution.API.Endpoints
 
         private static async Task<IResult> DeleteTag(
             Guid id,
-            [FromServices] TagService tagService,
+            [FromServices] ITagService tagService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
             var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
@@ -85,7 +86,7 @@ namespace NotesSolution.API.Endpoints
 
         private static async Task<IResult> GetTagById(
             Guid id,
-            [FromServices] TagService tagService,
+            [FromServices] ITagService tagService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
             var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
@@ -97,7 +98,7 @@ namespace NotesSolution.API.Endpoints
 
         private static async Task<IResult> GetTagByName(
             string name,
-            [FromServices] TagService tagService,
+            [FromServices] ITagService tagService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
             var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);

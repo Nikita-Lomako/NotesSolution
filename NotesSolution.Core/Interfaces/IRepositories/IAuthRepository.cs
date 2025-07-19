@@ -1,11 +1,12 @@
-using NotesSolution.Core.Dtos;
+using Microsoft.AspNetCore.Identity;
+using System.Threading.Tasks;
 
 namespace NotesSolution.Core.Interfaces.IRepositories
 {
     public interface IAuthRepository
     {
-        bool IsUniqueUser(string username);
-        Task<LoginResponseDto?> Login(LoginRequestDto loginRequestDto);
-        Task<UserDto?> Register(RegistrationRequestDto requestDto);
+        Task<IdentityUser?> FindByNameAsync(string username);
+        Task<IdentityUser?> Login(string username, string password);
+        Task<IdentityUser?> Register(string username, string password);
     }
 } 

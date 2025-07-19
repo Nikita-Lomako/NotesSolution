@@ -1,7 +1,6 @@
 using AutoMapper;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
-using NotesSolution.Core.Dtos;
 using NotesSolution.Core.Interfaces.IRepositories;
 using NotesSolution.Core.Models;
 using System.Net;
@@ -11,7 +10,8 @@ using NotesSolution.Core.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using System.Security.Claims;
-using NotesSolution.API.Services;
+using NotesSolution.Application.Dtos;
+using NotesSolution.Application.Services;
 
 namespace NotesSolution.API.Endpoints
 {
@@ -39,7 +39,7 @@ namespace NotesSolution.API.Endpoints
         }
 
         private static async Task<IResult> GetAllNotes(
-            [FromServices] NoteService noteService,
+            [FromServices] INoteService noteService,
             [FromServices] IHttpContextAccessor httpContextAccessor,
             [FromQuery] string? search, [FromQuery] string? tag, [FromQuery] string? sort, [FromQuery] string? order,
             [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
@@ -51,7 +51,7 @@ namespace NotesSolution.API.Endpoints
 
         private static async Task<IResult> GetNoteById(
             Guid id,
-            [FromServices] NoteService noteService,
+            [FromServices] INoteService noteService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
             var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
@@ -73,7 +73,7 @@ namespace NotesSolution.API.Endpoints
             [FromForm] string description,
             [FromForm] string tags,
             [FromForm] IFormFileCollection? images,
-            [FromServices] NoteService noteService,
+            [FromServices] INoteService noteService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
             var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
@@ -97,7 +97,7 @@ namespace NotesSolution.API.Endpoints
             [FromForm] string description,
             [FromForm] string tags,
             [FromForm] IFormFileCollection? images,
-            [FromServices] NoteService noteService,
+            [FromServices] INoteService noteService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
             var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
@@ -119,7 +119,7 @@ namespace NotesSolution.API.Endpoints
 
         private static async Task<IResult> DeleteNote(
             Guid id,
-            [FromServices] NoteService noteService,
+            [FromServices] INoteService noteService,
             [FromServices] IHttpContextAccessor httpContextAccessor)
         {
             var userId = httpContextAccessor.HttpContext.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);

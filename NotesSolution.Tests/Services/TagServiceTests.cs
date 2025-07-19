@@ -7,11 +7,13 @@ using FluentValidation;
 using FluentValidation.Results;
 using Microsoft.Extensions.Logging;
 using Moq;
-using NotesSolution.API.Services;
-using NotesSolution.Core.Dtos;
+using NotesSolution.Application.Services;
+using NotesSolution.Application.Dtos;
+using NotesSolution.Core.Interfaces;
 using NotesSolution.Core.Interfaces.IRepositories;
 using NotesSolution.Core.Models;
 using Xunit;
+using NotesSolution.Application.Interfaces;
 
 namespace NotesSolution.Tests.Services
 {
@@ -22,7 +24,7 @@ namespace NotesSolution.Tests.Services
         private readonly Mock<IMapper> _mockMapper;
         private readonly Mock<IValidator<TagRequestDto>> _mockValidator;
         private readonly Mock<ILogger<TagService>> _mockLogger;
-        private readonly TagService _tagService;
+        private readonly ITagService _tagService;
 
         public TagServiceTests()
         {

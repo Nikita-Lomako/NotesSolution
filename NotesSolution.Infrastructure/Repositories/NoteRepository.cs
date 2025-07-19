@@ -71,6 +71,7 @@ namespace NotesSolution.Infrastructure.Repositories
                 }
             }
             await _db.Notes.AddAsync(note);
+            await SaveAsync();
         }
         public async Task UpdateAsync(Note note)
         {
@@ -91,8 +92,17 @@ namespace NotesSolution.Infrastructure.Repositories
                 }
             }
             _db.Notes.Update(note);
+            await SaveAsync();
         }
-        public async Task RemoveAsync(Note note) { _db.Notes.Remove(note); await _db.SaveChangesAsync(); }
+        public async Task RemoveAsync(Note note)
+        {
+            var tracked = await _db.Notes.FindAsync(note.Id);
+            if (tracked != null)
+            {
+                _db.Notes.Remove(tracked);
+                await SaveAsync();
+            }
+        }
         public async Task SaveAsync() => await _db.SaveChangesAsync();
         public async Task<bool> ExistsAsync(Guid id) => await _db.Notes.AnyAsync(n => n.Id == id);
     }

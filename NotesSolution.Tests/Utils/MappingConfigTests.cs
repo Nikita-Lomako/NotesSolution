@@ -1,7 +1,8 @@
 ﻿using AutoMapper;
 using Microsoft.AspNetCore.Identity;
+using NotesSolution.Application;
+using NotesSolution.Application.Dtos;
 using NotesSolution.Core;
-using NotesSolution.Core.Dtos;
 using NotesSolution.Core.Models;
 using Xunit;
 

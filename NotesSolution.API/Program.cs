@@ -6,22 +6,22 @@ using NotesSolution.Infrastructure.Services;
 using NotesSolution.Core.Interfaces.IRepositories;
 using NotesSolution.Infrastructure.Repositories;
 using FluentValidation;
-using NotesSolution.Core.Dtos;
-using NotesSolution.Core.Validation;
-using AutoMapper;
-using NotesSolution.Core;
 using NotesSolution.API.Endpoints;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.OpenApi.Models;
-using NotesSolution.API.Services;
-using NotesSolution.Core.Services;
+using NotesSolution.Application.Dtos;
+using NotesSolution.Application.Validation;
+using NotesSolution.Application;
+using NotesSolution.Application.Services;
+using NotesSolution.Application.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+// In this section, services are registered before builder.Build():
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new Exception("Database connection string not configured");
 
@@ -37,12 +37,12 @@ builder.Services.AddScoped<IImageService>(provider =>
 {
     var config = provider.GetRequiredService<IConfiguration>();
     var env = provider.GetRequiredService<IWebHostEnvironment>();
-
     return new LocalImageService(
         Path.Combine(env.ContentRootPath, config["ImageStorage:Path"]),
         config["ImageStorage:BaseUrl"]
     );
 });
+
 
 // Register NoteRepository
 builder.Services.AddScoped<INoteRepository, NoteRepository>();
@@ -52,11 +52,12 @@ builder.Services.AddScoped<ITagRepository, TagRepository>();
 builder.Services.AddScoped<ITagHelperService, TagHelperService>();
 
 // Register NoteService
-builder.Services.AddScoped<NoteService>();
+builder.Services.AddScoped<INoteService, NoteService>();
 
 // Register TagService
-builder.Services.AddScoped<TagService>();
+builder.Services.AddScoped<ITagService, TagService>();
 
+builder.Services.AddScoped<IAuthService, AuthService>();
 
 
 // Register validators
@@ -70,7 +71,6 @@ builder.Services.AddAutoMapper(typeof(MappingConfig));
 
 // Add Identity
 builder.Services.AddIdentity<IdentityUser, IdentityRole>()
-    .AddDefaultTokenProviders()
     .AddEntityFrameworkStores<AppDbContext>();
 
 // Add AuthRepository
