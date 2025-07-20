@@ -28,7 +28,7 @@ namespace NotesSolution.Tests.Repositories
             var tag = new Tag { Name = "Test", UserId = "user1" };
             await repo.CreateAsync(tag);
             await repo.SaveAsync();
-            var fetched = await repo.GetByNameAsync("Test");
+            var fetched = await repo.GetByNameAsync("user1", "Test");
             Assert.NotNull(fetched);
             Assert.Equal("Test", fetched.Name);
         }
@@ -41,8 +41,36 @@ namespace NotesSolution.Tests.Repositories
             await repo.CreateAsync(new Tag { Name = "Tag1", UserId = "user1" });
             await repo.CreateAsync(new Tag { Name = "Tag2", UserId = "user2" });
             await repo.SaveAsync();
-            var all = await repo.GetAllAsync();
-            Assert.Equal(2, all.Count);
+            var user1Tags = await repo.GetAllAsync("user1");
+            var user2Tags = await repo.GetAllAsync("user2");
+            Assert.Single(user1Tags);
+            Assert.Single(user2Tags);
+            Assert.Equal("user1", user1Tags.First().UserId);
+            Assert.Equal("user2", user2Tags.First().UserId);
+        }
+
+        [Fact]
+        public async Task GetAsync_ReturnsNullForOtherUser()
+        {
+            var db = GetDbContext(nameof(GetAsync_ReturnsNullForOtherUser));
+            var repo = new TagRepository(db);
+            var tag = new Tag { Name = "Tag", UserId = "user1" };
+            await repo.CreateAsync(tag);
+            await repo.SaveAsync();
+            var fetched = await repo.GetAsync("user2", tag.Id);
+            Assert.Null(fetched);
+        }
+
+        [Fact]
+        public async Task GetByNameAsync_ReturnsNullForOtherUser()
+        {
+            var db = GetDbContext(nameof(GetByNameAsync_ReturnsNullForOtherUser));
+            var repo = new TagRepository(db);
+            var tag = new Tag { Name = "Tag", UserId = "user1" };
+            await repo.CreateAsync(tag);
+            await repo.SaveAsync();
+            var fetched = await repo.GetByNameAsync("user2", "Tag");
+            Assert.Null(fetched);
         }
 
         [Fact]
@@ -56,7 +84,7 @@ namespace NotesSolution.Tests.Repositories
             tag.Name = "New";
             await repo.UpdateAsync(tag);
             await repo.SaveAsync();
-            var updated = await repo.GetByNameAsync("New");
+            var updated = await repo.GetByNameAsync("user1", "New");
             Assert.NotNull(updated);
             Assert.Equal("New", updated.Name);
         }
@@ -71,7 +99,7 @@ namespace NotesSolution.Tests.Repositories
             await repo.SaveAsync();
             await repo.RemoveAsync(tag);
             await repo.SaveAsync();
-            var deleted = await repo.GetByNameAsync("ToDelete");
+            var deleted = await repo.GetByNameAsync("user1", "ToDelete");
             Assert.Null(deleted);
         }
     }

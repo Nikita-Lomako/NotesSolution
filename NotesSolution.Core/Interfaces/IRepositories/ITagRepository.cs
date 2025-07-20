@@ -4,9 +4,9 @@ namespace NotesSolution.Core.Interfaces.IRepositories
 {
     public interface ITagRepository
     {
-        Task<ICollection<Tag>> GetAllAsync();
-        Task<Tag?> GetAsync(Guid id);
-        Task<Tag?> GetByNameAsync(string name);
+        Task<ICollection<Tag>> GetAllAsync(string userId);
+        Task<Tag?> GetAsync(string userId, Guid id);
+        Task<Tag?> GetByNameAsync(string userId, string name);
         Task CreateAsync(Tag tag);
         Task SaveAsync();
         Task UpdateAsync(Tag tag);

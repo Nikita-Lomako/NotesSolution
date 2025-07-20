@@ -5,10 +5,10 @@ using System.Text;
 using System.Threading.Tasks;
 using AutoMapper;
 using Microsoft.AspNetCore.Identity;
-using NotesSolution.Core.Dtos;
+using NotesSolution.Application.Dtos;
 using NotesSolution.Core.Models;
 
-namespace NotesSolution.Core
+namespace NotesSolution.Application
 {
     public class MappingConfig : Profile
     {

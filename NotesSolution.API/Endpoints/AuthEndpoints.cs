@@ -1,9 +1,6 @@
-using AutoMapper;
-using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
-using NotesSolution.Core.Dtos;
-using NotesSolution.Core.Interfaces.IRepositories;
-using System.Net;
+using NotesSolution.Application.Dtos;
+using NotesSolution.Application.Interfaces;
 
 namespace NotesSolution.API.Endpoints
 {
@@ -25,10 +22,10 @@ namespace NotesSolution.API.Endpoints
         }
 
         private static async Task<IResult> Login(
-            [FromServices] IAuthRepository authRepo,
+            [FromServices] IAuthService authService,
             [FromBody] LoginRequestDto model)
         {
-            var loginResponse = await authRepo.Login(model);
+            var loginResponse = await authService.LoginAsync(model);
             if (loginResponse == null)
             {
                 return Results.BadRequest(new { Error = "Username or password is incorrect" });
@@ -37,14 +34,10 @@ namespace NotesSolution.API.Endpoints
         }
 
         private static async Task<IResult> Register(
-            [FromServices] IAuthRepository authRepo,
+            [FromServices] IAuthService authService,
             [FromBody] RegistrationRequestDto model)
         {
-            if (!authRepo.IsUniqueUser(model.UserName))
-            {
-                return Results.BadRequest(new { Error = "Username already exists" });
-            }
-            var registerResponse = await authRepo.Register(model);
+            var registerResponse = await authService.RegisterAsync(model);
             if (registerResponse == null || string.IsNullOrEmpty(registerResponse.Name))
             {
                 return Results.BadRequest(new { Error = "Registration failed. Please check provided information." });

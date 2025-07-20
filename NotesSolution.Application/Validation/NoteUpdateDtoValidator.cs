@@ -1,11 +1,11 @@
 using FluentValidation;
-using NotesSolution.Core.Dtos;
+using NotesSolution.Application.Dtos;
 
-namespace NotesSolution.Core.Validation
+namespace NotesSolution.Application.Validation
 {
-    public class NoteCreateDtoValidator : AbstractValidator<NoteCreateDto>
+    public class NoteUpdateDtoValidator : AbstractValidator<NoteUpdateDto>
     {
-        public NoteCreateDtoValidator()
+        public NoteUpdateDtoValidator()
         {
             RuleFor(x => x.Name).NotEmpty().MaximumLength(100);
             RuleFor(x => x.Description).MaximumLength(1000);

@@ -1,4 +1,4 @@
-namespace NotesSolution.Core.Dtos
+namespace NotesSolution.Application.Dtos
 {
     public class NoteUpdateDto
     {

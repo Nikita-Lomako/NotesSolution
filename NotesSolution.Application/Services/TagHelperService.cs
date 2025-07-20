@@ -4,7 +4,7 @@ using NotesSolution.Core.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace NotesSolution.Core.Services
+namespace NotesSolution.Application.Services
 {
     public class TagHelperService : ITagHelperService
     {
@@ -19,7 +19,7 @@ namespace NotesSolution.Core.Services
             var tagEntities = new List<Tag>();
             foreach (var tagName in tagNames)
             {
-                var existingTag = await _tagRepository.GetByNameAsync(tagName);
+                var existingTag = await _tagRepository.GetByNameAsync(userId, tagName);
                 if (existingTag != null && existingTag.UserId == userId)
                 {
                     tagEntities.Add(existingTag);
