@@ -1,6 +1,6 @@
 using FluentValidation.TestHelper;
-using NotesSolution.Core.Dtos;
-using NotesSolution.Core.Validation;
+using NotesSolution.Application.Dtos;
+using NotesSolution.Application.Validation;
 using Xunit;
 
 namespace NotesSolution.Tests.Validation

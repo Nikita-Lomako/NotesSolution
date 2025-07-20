@@ -30,6 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\NotesSolution.Application\NotesSolution.Application.csproj" />
     <ProjectReference Include="..\NotesSolution.Infrastructure\NotesSolution.Infrastructure.csproj" />
   </ItemGroup>
 

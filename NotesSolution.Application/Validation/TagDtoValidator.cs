@@ -1,7 +1,7 @@
 using FluentValidation;
-using NotesSolution.Core.Dtos;
+using NotesSolution.Application.Dtos;
 
-namespace NotesSolution.Core.Validation
+namespace NotesSolution.Application.Validation
 {
     public class TagDtoValidator : AbstractValidator<TagDto>
     {

@@ -28,23 +28,44 @@ namespace NotesSolution.Tests.Repositories
             var note = new Note { Name = "TestNote", Description = "desc", UserId = "user1" };
             await repo.CreateAsync(note);
             await repo.SaveAsync();
-            var fetched = await repo.GetAsync(note.Id);
+            var fetched = await repo.GetAsync("user1", note.Id);
             Assert.NotNull(fetched);
             Assert.Equal("TestNote", fetched.Name);
         }
 
         [Fact]
-        public async Task GetAllAsync_FiltersAndPaginates()
+        public async Task GetAllAsync_FiltersByUserId_AndPaginates()
         {
-            var db = GetDbContext(nameof(GetAllAsync_FiltersAndPaginates));
+            var db = GetDbContext(nameof(GetAllAsync_FiltersByUserId_AndPaginates));
             var repo = new NoteRepository(db);
-            for (int i = 1; i <= 15; i++)
-            {
+            for (int i = 1; i <= 10; i++)
                 await repo.CreateAsync(new Note { Name = $"Note{i}", Description = "desc", UserId = "user1" });
-            }
+            for (int i = 1; i <= 5; i++)
+                await repo.CreateAsync(new Note { Name = $"Other{i}", Description = "desc", UserId = "user2" });
             await repo.SaveAsync();
-            var notes = await repo.GetAllAsync(null, null, null, null, 2, 5); // page 2, pageSize 5
-            Assert.Equal(5, notes.Count);
+            var notes = await repo.GetAllAsync("user1", null, null, null, null, 1, 10);
+            Assert.Equal(10, notes.Count);
+            Assert.All(notes, n => Assert.Equal("user1", n.UserId));
+            var paged = await repo.GetAllAsync("user1", null, null, null, null, 2, 5);
+            Assert.Equal(5, paged.Count);
+        }
+
+        [Fact]
+        public async Task GetAllAsync_SearchAndTagFilterAndSort()
+        {
+            var db = GetDbContext(nameof(GetAllAsync_SearchAndTagFilterAndSort));
+            var repo = new NoteRepository(db);
+            var tag = new Tag { Name = "tag1", UserId = "user1" };
+            await db.Tags.AddAsync(tag);
+            await repo.CreateAsync(new Note { Name = "Alpha", Description = "desc", UserId = "user1", Tags = new List<Tag> { tag } });
+            await repo.CreateAsync(new Note { Name = "Beta", Description = "desc", UserId = "user1" });
+            await repo.SaveAsync();
+            var search = await repo.GetAllAsync("user1", "Alpha", null, null, null, 1, 10);
+            Assert.Single(search);
+            var tagFilter = await repo.GetAllAsync("user1", null, "tag1", null, null, 1, 10);
+            Assert.Single(tagFilter);
+            var sorted = await repo.GetAllAsync("user1", null, null, "name", "desc", 1, 10);
+            Assert.Equal("Beta", sorted.First().Name);
         }
 
         [Fact]
@@ -58,7 +79,7 @@ namespace NotesSolution.Tests.Repositories
             note.Name = "New";
             await repo.UpdateAsync(note);
             await repo.SaveAsync();
-            var updated = await repo.GetAsync(note.Id);
+            var updated = await repo.GetAsync("user1", note.Id);
             Assert.NotNull(updated);
             Assert.Equal("New", updated.Name);
         }
@@ -72,20 +93,22 @@ namespace NotesSolution.Tests.Repositories
             await repo.CreateAsync(note);
             await repo.SaveAsync();
             await repo.RemoveAsync(note);
-            var deleted = await repo.GetAsync(note.Id);
+            var deleted = await repo.GetAsync("user1", note.Id);
             Assert.Null(deleted);
         }
 
         [Fact]
-        public async Task ExistsAsync_ReturnsTrueIfExists()
+        public async Task ExistsAsync_ReturnsTrueIfExists_AndFalseIfNotExistsOrWrongUser()
         {
-            var db = GetDbContext(nameof(ExistsAsync_ReturnsTrueIfExists));
+            var db = GetDbContext(nameof(ExistsAsync_ReturnsTrueIfExists_AndFalseIfNotExistsOrWrongUser));
             var repo = new NoteRepository(db);
             var note = new Note { Name = "Exists", Description = "desc", UserId = "user1" };
             await repo.CreateAsync(note);
             await repo.SaveAsync();
-            var exists = await repo.ExistsAsync(note.Id);
+            var exists = await repo.ExistsAsync("user1", note.Id);
             Assert.True(exists);
+            var notExists = await repo.ExistsAsync("user2", note.Id);
+            Assert.False(notExists);
         }
     }
 }
