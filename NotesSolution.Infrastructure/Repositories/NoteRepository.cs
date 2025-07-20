@@ -14,9 +14,9 @@ namespace NotesSolution.Infrastructure.Repositories
             _db = db;
         }
 
-        public async Task<ICollection<Note>> GetAllAsync(string? search, string? tag, string? sort, string? order, int page, int pageSize)
+        public async Task<ICollection<Note>> GetAllAsync(string userId, string? search, string? tag, string? sort, string? order, int page, int pageSize)
         {
-            var query = _db.Notes.Include(n => n.Tags).AsQueryable();
+            var query = _db.Notes.Include(n => n.Tags).Where(n => n.UserId == userId).AsQueryable();
 
             if (!string.IsNullOrEmpty(search))
             {
@@ -51,7 +51,7 @@ namespace NotesSolution.Infrastructure.Repositories
                 .ToListAsync();
         }
 
-        public async Task<Note?> GetAsync(Guid id) => await _db.Notes.Include(n => n.Tags).FirstOrDefaultAsync(n => n.Id == id);
+        public async Task<Note?> GetAsync(string userId, Guid id) => await _db.Notes.Include(n => n.Tags).FirstOrDefaultAsync(n => n.Id == id && n.UserId == userId);
         public async Task CreateAsync(Note note)
         {
             for (int i = 0; i < note.Tags.Count; i++)
@@ -71,6 +71,7 @@ namespace NotesSolution.Infrastructure.Repositories
                 }
             }
             await _db.Notes.AddAsync(note);
+            await SaveAsync();
         }
         public async Task UpdateAsync(Note note)
         {
@@ -91,9 +92,18 @@ namespace NotesSolution.Infrastructure.Repositories
                 }
             }
             _db.Notes.Update(note);
+            await SaveAsync();
         }
-        public async Task RemoveAsync(Note note) { _db.Notes.Remove(note); await _db.SaveChangesAsync(); }
+        public async Task RemoveAsync(Note note)
+        {
+            var tracked = await _db.Notes.FindAsync(note.Id);
+            if (tracked != null)
+            {
+                _db.Notes.Remove(tracked);
+                await SaveAsync();
+            }
+        }
         public async Task SaveAsync() => await _db.SaveChangesAsync();
-        public async Task<bool> ExistsAsync(Guid id) => await _db.Notes.AnyAsync(n => n.Id == id);
+        public async Task<bool> ExistsAsync(string userId, Guid id) => await _db.Notes.AnyAsync(n => n.Id == id && n.UserId == userId);
     }
 } 

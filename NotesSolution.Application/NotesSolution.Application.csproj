@@ -7,18 +7,25 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Interfaces\IRepositories\" />
+    <Folder Include="Services\" />
+    <Folder Include="Dtos\" />
+    <Folder Include="Validation\" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AutoMapper" Version="14.0.0" />
     <PackageReference Include="FluentValidation" Version="12.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Http" Version="2.3.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Identity.Core" Version="8.0.17" />
     <PackageReference Include="Microsoft.Extensions.Identity.Stores" Version="8.0.17" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.12.1" />
     <PackageReference Include="System.Net.Http" Version="4.3.4" />
     <PackageReference Include="System.Text.RegularExpressions" Version="4.3.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NotesSolution.Core\NotesSolution.Core.csproj" />
   </ItemGroup>
 
 </Project>
