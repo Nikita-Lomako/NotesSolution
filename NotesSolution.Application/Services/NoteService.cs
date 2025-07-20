@@ -1,19 +1,20 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
-using NotesSolution.Core.Dtos;
+using NotesSolution.Application.Dtos;
 using NotesSolution.Core.Interfaces.IRepositories;
 using NotesSolution.Core.Models;
 using NotesSolution.Core.Interfaces;
 using AutoMapper;
 using FluentValidation;
 using Microsoft.Extensions.Logging;
+using NotesSolution.Application.Interfaces;
 
-namespace NotesSolution.API.Services
+namespace NotesSolution.Application.Services
 {
-    public class NoteService
+    public class NoteService : INoteService
     {
         private readonly INoteRepository _noteRepository;
         private readonly ITagRepository _tagRepository;
@@ -47,16 +48,14 @@ namespace NotesSolution.API.Services
         public async Task<List<NoteDto>> GetAllNotes(string userId, string? search, string? tag, string? sort, string? order, int page, int pageSize)
         {
             _logger.LogInformation("Getting all notes for user {UserId} with search={Search}, tag={Tag}, sort={Sort}, order={Order}, page={Page}, pageSize={PageSize}", userId, search, tag, sort, order, page, pageSize);
-            var notes = await _noteRepository.GetAllAsync(search, tag, sort, order, page, pageSize);
-            notes = notes.Where(n => n.UserId == userId).ToList();
+            var notes = await _noteRepository.GetAllAsync(userId, search, tag, sort, order, page, pageSize);
             _logger.LogInformation("Found {Count} notes for user {UserId}", notes.Count, userId);
             return _mapper.Map<List<NoteDto>>(notes);
         }
 
         private async Task<Note?> GetUserNoteByIdAsync(string userId, Guid id)
         {
-            var note = await _noteRepository.GetAsync(id);
-            return note != null && note.UserId == userId ? note : null;
+            return await _noteRepository.GetAsync(userId, id);
         }
 
         public async Task<NoteDto?> GetNoteById(string userId, Guid id)
@@ -105,7 +104,6 @@ namespace NotesSolution.API.Services
                 }
             }
             await _noteRepository.CreateAsync(note);
-            await _noteRepository.SaveAsync();
             _logger.LogInformation("Created new note with id {Id} for user {UserId}", note.Id, userId);
             return (_mapper.Map<NoteDto>(note), new List<string>());
         }
@@ -147,7 +145,7 @@ namespace NotesSolution.API.Services
                     if (!imageHashes.Contains(hash))
                     {
                         var imageUrl = await _imageService.SaveImageAsync(image);
-                        existingNote.ImageUrls.Add(imageUrl);
+                        existingNote.ImageUrls?.Add(imageUrl);
                         imageHashes.Add(hash);
                     }
                 }
@@ -175,6 +173,6 @@ namespace NotesSolution.API.Services
             }
             _logger.LogInformation("Note with id {Id} deleted for user {UserId}", id, userId);
             return true;
-        }
+        }       
     }
-}
+} 

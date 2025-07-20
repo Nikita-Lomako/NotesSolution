@@ -1,17 +1,18 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using NotesSolution.Core.Dtos;
+using NotesSolution.Application.Dtos;
 using NotesSolution.Core.Interfaces.IRepositories;
 using NotesSolution.Core.Models;
 using AutoMapper;
 using FluentValidation;
 using Microsoft.Extensions.Logging;
+using NotesSolution.Application.Interfaces;
 
-namespace NotesSolution.API.Services
+namespace NotesSolution.Application.Services
 {
-    public class TagService
+    public class TagService : ITagService
     {
         private readonly ITagRepository _tagRepository;
         private readonly INoteRepository _noteRepository;
@@ -36,8 +37,7 @@ namespace NotesSolution.API.Services
         public async Task<List<TagDto>> GetAllTags(string userId)
         {
             _logger.LogInformation("Getting all tags for user {UserId}", userId);
-            var tags = await _tagRepository.GetAllAsync();
-            tags = tags.Where(t => t.UserId == userId).ToList();
+            var tags = await _tagRepository.GetAllAsync(userId);
             _logger.LogInformation("Found {Count} tags for user {UserId}", tags.Count, userId);
             return _mapper.Map<List<TagDto>>(tags);
         }
@@ -77,7 +77,7 @@ namespace NotesSolution.API.Services
                 _logger.LogWarning("Validation failed for new tag: {Errors}", string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
                 return (null, validationResult.Errors.Select(e => e.ErrorMessage).ToList(), false);
             }
-            var existingTag = await _tagRepository.GetByNameAsync(tagDto.Name);
+            var existingTag = await _tagRepository.GetByNameAsync(userId, tagDto.Name);
             if (existingTag != null && existingTag.UserId == userId)
             {
                 _logger.LogWarning("Tag with name {Name} already exists for user {UserId}", tagDto.Name, userId);
@@ -85,7 +85,6 @@ namespace NotesSolution.API.Services
             }
             var tag = new Tag { Name = tagDto.Name, UserId = userId };
             await _tagRepository.CreateAsync(tag);
-            await _tagRepository.SaveAsync();
             _logger.LogInformation("Created new tag with id {Id} for user {UserId}", tag.Id, userId);
             return (_mapper.Map<TagDto>(tag), new List<string>(), false);
         }
@@ -113,7 +112,6 @@ namespace NotesSolution.API.Services
             }
             existingTag.Name = tagDto.Name;
             await _tagRepository.UpdateAsync(existingTag);
-            await _tagRepository.SaveAsync();
             _logger.LogInformation("Updated tag with id {Id} for user {UserId}", id, userId);
             return (_mapper.Map<TagDto>(existingTag), new List<string>(), false, false);
         }
@@ -129,31 +127,28 @@ namespace NotesSolution.API.Services
             }
             await RemoveTagFromAllUserNotesAsync(userId, id);
             await _tagRepository.RemoveAsync(tag);
-            await _tagRepository.SaveAsync();
             _logger.LogInformation("Deleted tag with id {Id} for user {UserId}", id, userId);
             return true;
         }
 
         private async Task<Tag?> GetUserTagByIdAsync(string userId, Guid id)
         {
-            var tag = await _tagRepository.GetAsync(id);
-            return tag != null && tag.UserId == userId ? tag : null;
+            return await _tagRepository.GetAsync(userId, id);
         }
 
         private async Task<Tag?> GetUserTagByNameAsync(string userId, string name)
         {
-            var tag = await _tagRepository.GetByNameAsync(name);
-            return tag != null && tag.UserId == userId ? tag : null;
+            return await _tagRepository.GetByNameAsync(userId, name);
         }
 
         private async Task RemoveTagFromAllUserNotesAsync(string userId, Guid tagId)
         {
-            var notes = await _noteRepository.GetAllAsync(null, null, null, null, 1, int.MaxValue);
-            foreach (var note in notes.Where(n => n.UserId == userId && n.Tags.Any(t => t.Id == tagId)))
+            var notes = await _noteRepository.GetAllAsync(userId, null, null, null, null, 1, int.MaxValue);
+            foreach (var note in notes.Where(n => n.Tags.Any(t => t.Id == tagId)))
             {
                 note.Tags.RemoveAll(t => t.Id == tagId);
                 await _noteRepository.UpdateAsync(note);
             }
         }
     }
-}
+} 
