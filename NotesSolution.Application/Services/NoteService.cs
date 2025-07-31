@@ -160,7 +160,6 @@ namespace NotesSolution.Application.Services
                 }
             var note = _mapper.Map<Note>(noteDto);
 
-                var note = _mapper.Map<Note>(noteDto);
                 note.UserId = userId;
 
                 // Check cancellation before tag processing
