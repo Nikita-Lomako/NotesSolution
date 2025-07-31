@@ -15,7 +15,7 @@ namespace NotesSolution.Tests.Services
 
         public JwtServiceTests()
         {
-            var inMemorySettings = new Dictionary<string, string> {
+            var inMemorySettings = new Dictionary<string, string?> {
                 { "ApiSettings:Secret", "supersecretkeysupersecretkeysupersecretkey" }
             };
             _configuration = new ConfigurationBuilder()

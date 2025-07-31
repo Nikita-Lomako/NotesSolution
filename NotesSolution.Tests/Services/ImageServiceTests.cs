@@ -3,6 +3,7 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using Moq;
 using NotesSolution.Infrastructure.Services;
 using Xunit;
@@ -18,7 +19,8 @@ namespace NotesSolution.Tests.Services
         public ImageServiceTests()
         {
             _tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-            _service = new LocalImageService(_tempDir, _baseUrl);
+            var logger = Mock.Of<ILogger<LocalImageService>>();
+            _service = new LocalImageService(_tempDir, _baseUrl, logger);
         }
 
         [Fact]
@@ -32,7 +34,7 @@ namespace NotesSolution.Tests.Services
             fileMock.Setup(f => f.OpenReadStream()).Returns(ms);
             fileMock.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), default)).Returns((Stream s, System.Threading.CancellationToken t) => ms.CopyToAsync(s));
 
-            var url = await _service.SaveImageAsync(fileMock.Object);
+            var url = await _service.SaveImageAsync(fileMock.Object, CancellationToken.None);
             Assert.StartsWith("/images/", url);
             var filePath = Path.Combine(_tempDir, url.Replace("/images/", ""));
             Assert.True(File.Exists(filePath));
@@ -57,7 +59,7 @@ namespace NotesSolution.Tests.Services
             var content = "hash me";
             var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
             fileMock.Setup(f => f.OpenReadStream()).Returns(ms);
-            var hash = await _service.ComputeImageHashAsync(fileMock.Object);
+            var hash = await _service.ComputeImageHashAsync(fileMock.Object, CancellationToken.None);
             Assert.False(string.IsNullOrWhiteSpace(hash));
             Assert.Equal(64, hash.Length); // SHA256 hash length in hex
         }

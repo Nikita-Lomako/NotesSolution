@@ -8,6 +8,7 @@ using System.Security.Claims;
 using NotesSolution.Application.Dtos;
 using NotesSolution.Core.Interfaces;
 using NotesSolution.Application.Interfaces;
+using System.Threading;
 
 namespace NotesSolution.API.Endpoints
 {
@@ -34,78 +35,162 @@ namespace NotesSolution.API.Endpoints
 
         private static async Task<IResult> GetAllTags(
             [FromServices] ITagService tagService,
-            [FromServices] IHttpContextAccessor httpContextAccessor)
+            [FromServices] IHttpContextAccessor httpContextAccessor,
+            CancellationToken cancellationToken = default)
         {
-            var userId = httpContextAccessor.HttpContext?.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
-            var tags = await tagService.GetAllTags(userId);
-            return Results.Ok(tags);
+            try
+            {
+                var userId = httpContextAccessor.HttpContext?.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+                if (userId == null)
+                    return Results.Unauthorized();
+                var tags = await tagService.GetAllTags(userId, cancellationToken);
+                return Results.Ok(tags);
+            }
+            catch (OperationCanceledException)
+            {
+                return Results.StatusCode(499); // Client Closed Request
+            }
+            catch (Exception)
+            {
+                return Results.Problem("An error occurred while retrieving tags", statusCode: 500);
+            }
         }
 
         private static async Task<IResult> CreateTag(
             TagRequestDto tagDto,
             [FromServices] ITagService tagService,
-            [FromServices] IHttpContextAccessor httpContextAccessor)
+            [FromServices] IHttpContextAccessor httpContextAccessor,
+            CancellationToken cancellationToken = default)
         {
-            var userId = httpContextAccessor.HttpContext?.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
-            var (createdTag, errors, conflict) = await tagService.CreateTag(userId, tagDto);
-            if (conflict)
-                return Results.Conflict($"Tag with name '{tagDto.Name}' already exists.");
-            if (errors.Count > 0)
-                return Results.BadRequest(errors);
-            return Results.Created($"/api/tags/{createdTag?.Id}", createdTag);
+            try
+            {
+                var userId = httpContextAccessor.HttpContext?.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+                if (userId == null)
+                    return Results.Unauthorized();
+                var (createdTag, errors, conflict) = await tagService.CreateTag(userId, tagDto, cancellationToken);
+                if (conflict)
+                    return Results.Conflict($"Tag with name '{tagDto.Name}' already exists.");
+                if (errors.Count > 0)
+                    return Results.BadRequest(errors);
+                return Results.Created($"/api/tags/{createdTag?.Id}", createdTag);
+            }
+            catch (OperationCanceledException)
+            {
+                return Results.StatusCode(499); // Client Closed Request
+            }
+            catch (Exception)
+            {
+                return Results.Problem("An error occurred while creating the tag", statusCode: 500);
+            }
         }
 
         private static async Task<IResult> UpdateTag(
             Guid id,
             TagRequestDto tagDto,
             [FromServices] ITagService tagService,
-            [FromServices] IHttpContextAccessor httpContextAccessor)
+            [FromServices] IHttpContextAccessor httpContextAccessor,
+            CancellationToken cancellationToken = default)
         {
-            var userId = httpContextAccessor.HttpContext?.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
-            var (updatedTag, errors, notFound, conflict) = await tagService.UpdateTag(userId, id, tagDto);
-            if (notFound)
-                return Results.NotFound();
-            if (conflict)
-                return Results.Conflict($"Tag with name '{tagDto.Name}' already exists.");
-            if (errors.Count > 0)
-                return Results.BadRequest(errors);
-            return Results.Ok(updatedTag);
+            try
+            {
+                var userId = httpContextAccessor.HttpContext?.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+                if (userId == null)
+                    return Results.Unauthorized();
+                var (updatedTag, errors, notFound, conflict) = await tagService.UpdateTag(userId, id, tagDto, cancellationToken);
+                if (notFound)
+                    return Results.NotFound();
+                if (conflict)
+                    return Results.Conflict($"Tag with name '{tagDto.Name}' already exists.");
+                if (errors.Count > 0)
+                    return Results.BadRequest(errors);
+                return Results.Ok(updatedTag);
+            }
+            catch (OperationCanceledException)
+            {
+                return Results.StatusCode(499); // Client Closed Request
+            }
+            catch (Exception)
+            {
+                return Results.Problem("An error occurred while updating the tag", statusCode: 500);
+            }
         }
 
         private static async Task<IResult> DeleteTag(
             Guid id,
             [FromServices] ITagService tagService,
-            [FromServices] IHttpContextAccessor httpContextAccessor)
+            [FromServices] IHttpContextAccessor httpContextAccessor,
+            CancellationToken cancellationToken = default)
         {
-            var userId = httpContextAccessor.HttpContext?.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
-            var deleted = await tagService.DeleteTag(userId, id);
-            if (!deleted)
-                return Results.NotFound();
-            return Results.NoContent();
+            try
+            {
+                var userId = httpContextAccessor.HttpContext?.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+                if (userId == null)
+                    return Results.Unauthorized();
+                var deleted = await tagService.DeleteTag(userId, id, cancellationToken);
+                if (!deleted)
+                    return Results.NotFound();
+                return Results.NoContent();
+            }
+            catch (OperationCanceledException)
+            {
+                return Results.StatusCode(499); // Client Closed Request
+            }
+            catch (Exception)
+            {
+                return Results.Problem("An error occurred while deleting the tag", statusCode: 500);
+            }
         }
 
         private static async Task<IResult> GetTagById(
             Guid id,
             [FromServices] ITagService tagService,
-            [FromServices] IHttpContextAccessor httpContextAccessor)
+            [FromServices] IHttpContextAccessor httpContextAccessor,
+            CancellationToken cancellationToken = default)
         {
-            var userId = httpContextAccessor.HttpContext?.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
-            var tag = await tagService.GetTagById(userId, id);
-            if (tag == null)
-                return Results.NotFound();
-            return Results.Ok(tag);
+            try
+            {
+                var userId = httpContextAccessor.HttpContext?.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+                if (userId == null)
+                    return Results.Unauthorized();
+                var tag = await tagService.GetTagById(userId, id, cancellationToken);
+                if (tag == null)
+                    return Results.NotFound();
+                return Results.Ok(tag);
+            }
+            catch (OperationCanceledException)
+            {
+                return Results.StatusCode(499); // Client Closed Request
+            }
+            catch (Exception)
+            {
+                return Results.Problem("An error occurred while retrieving the tag", statusCode: 500);
+            }
         }
 
         private static async Task<IResult> GetTagByName(
             string name,
             [FromServices] ITagService tagService,
-            [FromServices] IHttpContextAccessor httpContextAccessor)
+            [FromServices] IHttpContextAccessor httpContextAccessor,
+            CancellationToken cancellationToken = default)
         {
-            var userId = httpContextAccessor.HttpContext?.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
-            var tag = await tagService.GetTagByName(userId, name);
-            if (tag == null)
-                return Results.NotFound();
-            return Results.Ok(tag);
+            try
+            {
+                var userId = httpContextAccessor.HttpContext?.User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+                if (userId == null)
+                    return Results.Unauthorized();
+                var tag = await tagService.GetTagByName(userId, name, cancellationToken);
+                if (tag == null)
+                    return Results.NotFound();
+                return Results.Ok(tag);
+            }
+            catch (OperationCanceledException)
+            {
+                return Results.StatusCode(499); // Client Closed Request
+            }
+            catch (Exception)
+            {
+                return Results.Problem("An error occurred while retrieving the tag", statusCode: 500);
+            }
         }
     }
 } 
