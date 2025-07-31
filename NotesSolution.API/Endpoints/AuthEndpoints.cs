@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using NotesSolution.Application.Dtos;
 using NotesSolution.Application.Interfaces;
+using System.Threading;
 
 namespace NotesSolution.API.Endpoints
 {
@@ -23,26 +24,50 @@ namespace NotesSolution.API.Endpoints
 
         private static async Task<IResult> Login(
             [FromServices] IAuthService authService,
-            [FromBody] LoginRequestDto model)
+            [FromBody] LoginRequestDto model,
+            CancellationToken cancellationToken = default)
         {
-            var loginResponse = await authService.LoginAsync(model);
-            if (loginResponse == null)
+            try
             {
-                return Results.BadRequest(new { Error = "Username or password is incorrect" });
+                var loginResponse = await authService.LoginAsync(model, cancellationToken);
+                if (loginResponse == null)
+                {
+                    return Results.BadRequest(new { Error = "Username or password is incorrect" });
+                }
+                return Results.Ok(loginResponse);
             }
-            return Results.Ok(loginResponse);
+            catch (OperationCanceledException)
+            {
+                return Results.StatusCode(499); // Client Closed Request
+            }
+            catch (Exception)
+            {
+                return Results.Problem("An error occurred during login", statusCode: 500);
+            }
         }
 
         private static async Task<IResult> Register(
             [FromServices] IAuthService authService,
-            [FromBody] RegistrationRequestDto model)
+            [FromBody] RegistrationRequestDto model,
+            CancellationToken cancellationToken = default)
         {
-            var registerResponse = await authService.RegisterAsync(model);
-            if (registerResponse == null || string.IsNullOrEmpty(registerResponse.Name))
+            try
             {
-                return Results.BadRequest(new { Error = "Registration failed. Please check provided information." });
+                var registerResponse = await authService.RegisterAsync(model, cancellationToken);
+                if (registerResponse == null || string.IsNullOrEmpty(registerResponse.Name))
+                {
+                    return Results.BadRequest(new { Error = "Registration failed. Please check provided information." });
+                }
+                return Results.Ok(registerResponse);
             }
-            return Results.Ok(registerResponse);
+            catch (OperationCanceledException)
+            {
+                return Results.StatusCode(499); // Client Closed Request
+            }
+            catch (Exception)
+            {
+                return Results.Problem("An error occurred during registration", statusCode: 500);
+            }
         }
     }
 } 
