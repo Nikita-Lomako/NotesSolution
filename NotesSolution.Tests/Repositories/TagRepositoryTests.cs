@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Moq;
 using NotesSolution.Core.Models;
 using NotesSolution.Infrastructure.Data;
 using NotesSolution.Infrastructure.Repositories;
@@ -24,7 +26,8 @@ namespace NotesSolution.Tests.Repositories
         public async Task CreateAndGet_Tag_Success()
         {
             var db = GetDbContext(nameof(CreateAndGet_Tag_Success));
-            var repo = new TagRepository(db);
+            var logger = Mock.Of<ILogger<TagRepository>>();
+            var repo = new TagRepository(db, logger);
             var tag = new Tag { Name = "Test", UserId = "user1" };
             await repo.CreateAsync(tag);
             await repo.SaveAsync();
@@ -37,7 +40,8 @@ namespace NotesSolution.Tests.Repositories
         public async Task GetAllAsync_ReturnsOnlyUserTags()
         {
             var db = GetDbContext(nameof(GetAllAsync_ReturnsOnlyUserTags));
-            var repo = new TagRepository(db);
+            var logger = Mock.Of<ILogger<TagRepository>>();
+            var repo = new TagRepository(db, logger);
             await repo.CreateAsync(new Tag { Name = "Tag1", UserId = "user1" });
             await repo.CreateAsync(new Tag { Name = "Tag2", UserId = "user2" });
             await repo.SaveAsync();
@@ -53,7 +57,8 @@ namespace NotesSolution.Tests.Repositories
         public async Task GetAsync_ReturnsNullForOtherUser()
         {
             var db = GetDbContext(nameof(GetAsync_ReturnsNullForOtherUser));
-            var repo = new TagRepository(db);
+            var logger = Mock.Of<ILogger<TagRepository>>();
+            var repo = new TagRepository(db, logger);
             var tag = new Tag { Name = "Tag", UserId = "user1" };
             await repo.CreateAsync(tag);
             await repo.SaveAsync();
@@ -65,7 +70,8 @@ namespace NotesSolution.Tests.Repositories
         public async Task GetByNameAsync_ReturnsNullForOtherUser()
         {
             var db = GetDbContext(nameof(GetByNameAsync_ReturnsNullForOtherUser));
-            var repo = new TagRepository(db);
+            var logger = Mock.Of<ILogger<TagRepository>>();
+            var repo = new TagRepository(db, logger);
             var tag = new Tag { Name = "Tag", UserId = "user1" };
             await repo.CreateAsync(tag);
             await repo.SaveAsync();
@@ -77,7 +83,8 @@ namespace NotesSolution.Tests.Repositories
         public async Task UpdateAsync_ChangesTagName()
         {
             var db = GetDbContext(nameof(UpdateAsync_ChangesTagName));
-            var repo = new TagRepository(db);
+            var logger = Mock.Of<ILogger<TagRepository>>();
+            var repo = new TagRepository(db, logger);
             var tag = new Tag { Name = "Old", UserId = "user1" };
             await repo.CreateAsync(tag);
             await repo.SaveAsync();
@@ -93,7 +100,8 @@ namespace NotesSolution.Tests.Repositories
         public async Task RemoveAsync_DeletesTag()
         {
             var db = GetDbContext(nameof(RemoveAsync_DeletesTag));
-            var repo = new TagRepository(db);
+            var logger = Mock.Of<ILogger<TagRepository>>();
+            var repo = new TagRepository(db, logger);
             var tag = new Tag { Name = "ToDelete", UserId = "user1" };
             await repo.CreateAsync(tag);
             await repo.SaveAsync();

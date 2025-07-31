@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using NotesSolution.Application.Dtos;
@@ -24,6 +25,7 @@ namespace NotesSolution.Application.Services
         private readonly IValidator<NoteUpdateDto> _updateValidator;
         private readonly ILogger<NoteService> _logger;
         private readonly ITagHelperService _tagHelperService;
+        private readonly ICancellationTokenProvider _cancellationTokenProvider;
 
         public NoteService(
             INoteRepository noteRepository,
@@ -33,7 +35,8 @@ namespace NotesSolution.Application.Services
             IValidator<NoteCreateDto> createValidator,
             IValidator<NoteUpdateDto> updateValidator,
             ILogger<NoteService> logger,
-            ITagHelperService tagHelperService)
+            ITagHelperService tagHelperService,
+            ICancellationTokenProvider cancellationTokenProvider)
         {
             _noteRepository = noteRepository;
             _tagRepository = tagRepository;
@@ -43,136 +46,322 @@ namespace NotesSolution.Application.Services
             _updateValidator = updateValidator;
             _logger = logger;
             _tagHelperService = tagHelperService;
+            _cancellationTokenProvider = cancellationTokenProvider;
         }
 
-        public async Task<List<NoteDto>> GetAllNotes(string userId, string? search, string? tag, string? sort, string? order, int page, int pageSize)
+        public async Task<List<NoteDto>> GetAllNotes(string userId, string? search, string? tag, string? sort, string? order, int page, int pageSize, CancellationToken cancellationToken = default)
         {
-            _logger.LogInformation("Getting all notes for user {UserId} with search={Search}, tag={Tag}, sort={Sort}, order={Order}, page={Page}, pageSize={PageSize}", userId, search, tag, sort, order, page, pageSize);
-            var notes = await _noteRepository.GetAllAsync(userId, search, tag, sort, order, page, pageSize);
-            _logger.LogInformation("Found {Count} notes for user {UserId}", notes.Count, userId);
-            return _mapper.Map<List<NoteDto>>(notes);
-        }
-
-        private async Task<Note?> GetUserNoteByIdAsync(string userId, Guid id)
-        {
-            return await _noteRepository.GetAsync(userId, id);
-        }
-
-        public async Task<NoteDto?> GetNoteById(string userId, Guid id)
-        {
-            _logger.LogInformation("Getting note with id = {Id} for user {UserId}", id, userId);
-            var note = await GetUserNoteByIdAsync(userId, id);
-            if (note == null)
+            try
             {
-                _logger.LogWarning("Note with id {Id} not found or not owned by user {UserId}", id, userId);
-                return null;
+                // Use linked token source to combine request token with timeout
+                using var timeoutTokenSource = _cancellationTokenProvider.CreateTimeoutTokenSource(30000); // 30 seconds timeout
+                using var linkedTokenSource = _cancellationTokenProvider.CreateLinkedTokenSource(
+                    cancellationToken, 
+                    timeoutTokenSource.Token, 
+                    _cancellationTokenProvider.GetDefaultToken());
+
+                var combinedToken = linkedTokenSource.Token;
+
+                _logger.LogInformation("Getting all notes for user {UserId} with search={Search}, tag={Tag}, sort={Sort}, order={Order}, page={Page}, pageSize={PageSize}", 
+                    userId, search, tag, sort, order, page, pageSize);
+
+                // Check cancellation before database operation
+                combinedToken.ThrowIfCancellationRequested();
+
+                var notes = await _noteRepository.GetAllAsync(userId, search, tag, sort, order, page, pageSize, combinedToken);
+                
+                _logger.LogInformation("Found {Count} notes for user {UserId}", notes.Count, userId);
+                return _mapper.Map<List<NoteDto>>(notes);
             }
-            _logger.LogInformation("Note with id {Id} found for user {UserId}", id, userId);
-            return _mapper.Map<NoteDto>(note);
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Operation was cancelled for user {UserId}", userId);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting notes for user {UserId}", userId);
+                throw;
+            }
         }
 
-        public async Task<(NoteDto? note, List<string> errors)> CreateNote(string userId, NoteCreateDto noteDto, IFormFileCollection? images)
+        private async Task<Note?> GetUserNoteByIdAsync(string userId, Guid id, CancellationToken cancellationToken = default)
         {
-            _logger.LogInformation("Attempting to create new note for user {UserId} with name={Name}", userId, noteDto.Name);
-            var validationResult = await _createValidator.ValidateAsync(noteDto);
-            if (!validationResult.IsValid)
+            try
             {
-                _logger.LogWarning("Validation failed for new note: {Errors}", string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
-                return (null, validationResult.Errors.Select(e => e.ErrorMessage).ToList());
+                using var timeoutTokenSource = _cancellationTokenProvider.CreateTimeoutTokenSource(15000); // 15 seconds timeout
+                using var linkedTokenSource = _cancellationTokenProvider.CreateLinkedTokenSource(
+                    cancellationToken, 
+                    timeoutTokenSource.Token, 
+                    _cancellationTokenProvider.GetDefaultToken());
+
+                var combinedToken = linkedTokenSource.Token;
+                combinedToken.ThrowIfCancellationRequested();
+
+                return await _noteRepository.GetAsync(userId, id, combinedToken);
             }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Get note operation was cancelled for user {UserId}, note {Id}", userId, id);
+                throw;
+            }
+        }
+
+        public async Task<NoteDto?> GetNoteById(string userId, Guid id, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                _logger.LogInformation("Getting note with id = {Id} for user {UserId}", id, userId);
+                var note = await GetUserNoteByIdAsync(userId, id, cancellationToken);
+                if (note == null)
+                {
+                    _logger.LogWarning("Note with id {Id} not found or not owned by user {UserId}", id, userId);
+                    return null;
+                }
+                _logger.LogInformation("Note with id {Id} found for user {UserId}", id, userId);
+                return _mapper.Map<NoteDto>(note);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Get note by id operation was cancelled for user {UserId}, note {Id}", userId, id);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting note {Id} for user {UserId}", id, userId);
+                throw;
+            }
+        }
+
+        public async Task<(NoteDto? note, List<string> errors)> CreateNote(string userId, NoteCreateDto noteDto, IFormFileCollection? images, CancellationToken cancellationToken = default)
+        {
+            var errors = new List<string>();
+            
+            try
+            {
+                using var timeoutTokenSource = _cancellationTokenProvider.CreateTimeoutTokenSource(60000); // 60 seconds timeout for image processing
+                using var linkedTokenSource = _cancellationTokenProvider.CreateLinkedTokenSource(
+                    cancellationToken, 
+                    timeoutTokenSource.Token, 
+                    _cancellationTokenProvider.GetDefaultToken());
+
+                var combinedToken = linkedTokenSource.Token;
+
+                _logger.LogInformation("Attempting to create new note for user {UserId} with name={Name}", userId, noteDto.Name);
+                
+                // Check cancellation before validation
+                combinedToken.ThrowIfCancellationRequested();
+                
+                var validationResult = await _createValidator.ValidateAsync(noteDto, combinedToken);
+                if (!validationResult.IsValid)
+                {
+                    _logger.LogWarning("Validation failed for new note: {Errors}", string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
+                    return (null, validationResult.Errors.Select(e => e.ErrorMessage).ToList());
+                }
             var note = _mapper.Map<Note>(noteDto);
 
-            note.UserId = userId;
+                var note = _mapper.Map<Note>(noteDto);
+                note.UserId = userId;
 
-            var tagEntities = await _tagHelperService.GetOrCreateTagsAsync(noteDto.Tags, userId);
+                // Check cancellation before tag processing
+                combinedToken.ThrowIfCancellationRequested();
+                var tagEntities = await _tagHelperService.GetOrCreateTagsAsync(noteDto.Tags, userId, combinedToken);
 
-            note.Tags = tagEntities;
-            note.CreationDate = DateTime.UtcNow;
-            var imageHashes = new HashSet<string>();
-            
-            if (images != null && images.Count > 0)
-            {
-                foreach (var image in images)
+                note.Tags = tagEntities;
+                note.CreationDate = DateTime.UtcNow;
+                var imageHashes = new HashSet<string>();
+                
+                if (images != null && images.Count > 0)
                 {
-                    var hash = await _imageService.ComputeImageHashAsync(image);
-                    if (!imageHashes.Contains(hash))
+                    foreach (var image in images)
                     {
-                        var imageUrl = await _imageService.SaveImageAsync(image);
-                        note.ImageUrls.Add(imageUrl);
-                        imageHashes.Add(hash);
+                        // Check cancellation before each image processing
+                        combinedToken.ThrowIfCancellationRequested();
+                        
+                        var hash = await _imageService.ComputeImageHashAsync(image, combinedToken);
+                        if (!imageHashes.Contains(hash))
+                        {
+                            var imageUrl = await _imageService.SaveImageAsync(image, combinedToken);
+                            note.ImageUrls.Add(imageUrl);
+                            imageHashes.Add(hash);
+                        }
                     }
                 }
+
+                // Check cancellation before database operation
+                combinedToken.ThrowIfCancellationRequested();
+                await _noteRepository.CreateAsync(note, combinedToken);
+                
+                _logger.LogInformation("Created new note with id {Id} for user {UserId}", note.Id, userId);
+                return (_mapper.Map<NoteDto>(note), new List<string>());
             }
-            await _noteRepository.CreateAsync(note);
-            _logger.LogInformation("Created new note with id {Id} for user {UserId}", note.Id, userId);
-            return (_mapper.Map<NoteDto>(note), new List<string>());
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Create note operation was cancelled for user {UserId}", userId);
+                errors.Add("Operation was cancelled");
+                return (null, errors);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating note for user {UserId}", userId);
+                errors.Add("An error occurred while creating the note");
+                return (null, errors);
+            }
         }
 
-        public async Task<(NoteDto? note, List<string> errors, bool notFound)> UpdateNote(string userId, Guid id, NoteUpdateDto noteDto, IFormFileCollection? images)
+        public async Task<(NoteDto? note, List<string> errors, bool notFound)> UpdateNote(string userId, Guid id, NoteUpdateDto noteDto, IFormFileCollection? images, CancellationToken cancellationToken = default)
         {
-            _logger.LogInformation("Updating note with id {Id} for user {UserId}", id, userId);
-            var validationResult = await _updateValidator.ValidateAsync(noteDto);
-            if (!validationResult.IsValid)
-            {
-                _logger.LogWarning("Validation failed for updating note {Id}: {Errors}", id, string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
-                return (null, validationResult.Errors.Select(e => e.ErrorMessage).ToList(), false);
-            }
-            var existingNote = await GetUserNoteByIdAsync(userId, id);
-            if (existingNote == null)
-            {
-                _logger.LogWarning("Note with id {Id} not found or not owned by user {UserId}", id, userId);
-                return (null, new List<string>(), true);
-            }
+            var errors = new List<string>();
             
-            var tagEntities = await _tagHelperService.GetOrCreateTagsAsync(noteDto.Tags, userId);
+            try
+            {
+                using var timeoutTokenSource = _cancellationTokenProvider.CreateTimeoutTokenSource(60000); // 60 seconds timeout
+                using var linkedTokenSource = _cancellationTokenProvider.CreateLinkedTokenSource(
+                    cancellationToken, 
+                    timeoutTokenSource.Token, 
+                    _cancellationTokenProvider.GetDefaultToken());
 
-            _mapper.Map(noteDto, existingNote);
-            existingNote.Tags = tagEntities;
-            if (existingNote.ImageUrls != null && existingNote.ImageUrls.Count > 0)
-            {
-                foreach (var imageUrl in existingNote.ImageUrls)
+                var combinedToken = linkedTokenSource.Token;
+
+                _logger.LogInformation("Updating note with id {Id} for user {UserId}", id, userId);
+                
+                // Check cancellation before validation
+                combinedToken.ThrowIfCancellationRequested();
+                
+                var validationResult = await _updateValidator.ValidateAsync(noteDto, combinedToken);
+                if (!validationResult.IsValid)
                 {
-                    _imageService.DeleteImage(imageUrl);
+                    _logger.LogWarning("Validation failed for updating note {Id}: {Errors}", id, string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
+                    return (null, validationResult.Errors.Select(e => e.ErrorMessage).ToList(), false);
                 }
-                existingNote.ImageUrls.Clear();
-            }
-            var imageHashes = new HashSet<string>();
-            if (images != null && images.Count > 0)
-            {
-                foreach (var image in images)
+
+                var existingNote = await GetUserNoteByIdAsync(userId, id, combinedToken);
+                if (existingNote == null)
                 {
-                    var hash = await _imageService.ComputeImageHashAsync(image);
-                    if (!imageHashes.Contains(hash))
+                    _logger.LogWarning("Note with id {Id} not found or not owned by user {UserId}", id, userId);
+                    return (null, new List<string>(), true);
+                }
+                
+                // Check cancellation before tag processing
+                combinedToken.ThrowIfCancellationRequested();
+                var tagEntities = await _tagHelperService.GetOrCreateTagsAsync(noteDto.Tags, userId, combinedToken);
+
+                _mapper.Map(noteDto, existingNote);
+                existingNote.Tags = tagEntities;
+                
+                // Safely delete old images
+                if (existingNote.ImageUrls != null && existingNote.ImageUrls.Count > 0)
+                {
+                    foreach (var imageUrl in existingNote.ImageUrls)
                     {
-                        var imageUrl = await _imageService.SaveImageAsync(image);
-                        existingNote.ImageUrls?.Add(imageUrl);
-                        imageHashes.Add(hash);
+                        try
+                        {
+                            _imageService.DeleteImage(imageUrl);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to delete old image {ImageUrl}", imageUrl);
+                        }
+                    }
+                    existingNote.ImageUrls.Clear();
+                }
+                
+                var imageHashes = new HashSet<string>();
+                if (images != null && images.Count > 0)
+                {
+                    foreach (var image in images)
+                    {
+                        // Check cancellation before each image processing
+                        combinedToken.ThrowIfCancellationRequested();
+                        
+                        var hash = await _imageService.ComputeImageHashAsync(image, combinedToken);
+                        if (!imageHashes.Contains(hash))
+                        {
+                            var imageUrl = await _imageService.SaveImageAsync(image, combinedToken);
+                            existingNote.ImageUrls?.Add(imageUrl);
+                            imageHashes.Add(hash);
+                        }
                     }
                 }
+
+                // Check cancellation before database operations
+                combinedToken.ThrowIfCancellationRequested();
+                await _noteRepository.UpdateAsync(existingNote, combinedToken);
+                await _noteRepository.SaveAsync(combinedToken);
+                
+                _logger.LogInformation("Updated note with id {Id} for user {UserId}", id, userId);
+                return (_mapper.Map<NoteDto>(existingNote), new List<string>(), false);
             }
-            await _noteRepository.UpdateAsync(existingNote);
-            await _noteRepository.SaveAsync();
-            _logger.LogInformation("Updated note with id {Id} for user {UserId}", id, userId);
-            return (_mapper.Map<NoteDto>(existingNote), new List<string>(), false);
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Update note operation was cancelled for user {UserId}, note {Id}", userId, id);
+                errors.Add("Operation was cancelled");
+                return (null, errors, false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating note {Id} for user {UserId}", id, userId);
+                errors.Add("An error occurred while updating the note");
+                return (null, errors, false);
+            }
         }
 
-        public async Task<bool> DeleteNote(string userId, Guid id)
+        public async Task<bool> DeleteNote(string userId, Guid id, CancellationToken cancellationToken = default)
         {
-            _logger.LogInformation("Deleting note with id {Id} for user {UserId}", id, userId);
-            var existingNote = await GetUserNoteByIdAsync(userId, id);
-            if (existingNote == null)
+            try
             {
-                _logger.LogWarning("Note with id {Id} not found or not owned by user {UserId}", id, userId);
+                using var timeoutTokenSource = _cancellationTokenProvider.CreateTimeoutTokenSource(30000); // 30 seconds timeout
+                using var linkedTokenSource = _cancellationTokenProvider.CreateLinkedTokenSource(
+                    cancellationToken, 
+                    timeoutTokenSource.Token, 
+                    _cancellationTokenProvider.GetDefaultToken());
+
+                var combinedToken = linkedTokenSource.Token;
+
+                _logger.LogInformation("Deleting note with id {Id} for user {UserId}", id, userId);
+                
+                // Check cancellation before getting note
+                combinedToken.ThrowIfCancellationRequested();
+                
+                var existingNote = await GetUserNoteByIdAsync(userId, id, combinedToken);
+                if (existingNote == null)
+                {
+                    _logger.LogWarning("Note with id {Id} not found or not owned by user {UserId}", id, userId);
+                    return false;
+                }
+
+                var imageUrls = existingNote.ImageUrls?.ToList() ?? new List<string>();
+                
+                // Check cancellation before database operation
+                combinedToken.ThrowIfCancellationRequested();
+                await _noteRepository.RemoveAsync(existingNote, combinedToken);
+                
+                // Safely delete images after successful database operation
+                foreach (var imageUrl in imageUrls)
+                {
+                    try
+                    {
+                        _imageService.DeleteImage(imageUrl);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to delete image {ImageUrl} for note {Id}", imageUrl, id);
+                    }
+                }
+                
+                _logger.LogInformation("Note with id {Id} deleted for user {UserId}", id, userId);
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Delete note operation was cancelled for user {UserId}, note {Id}", userId, id);
                 return false;
             }
-            var imageUrls = existingNote.ImageUrls?.ToList() ?? new List<string>();
-            await _noteRepository.RemoveAsync(existingNote);
-            foreach (var imageUrl in imageUrls)
+            catch (Exception ex)
             {
-                _imageService.DeleteImage(imageUrl);
+                _logger.LogError(ex, "Error deleting note {Id} for user {UserId}", id, userId);
+                return false;
             }
-            _logger.LogInformation("Note with id {Id} deleted for user {UserId}", id, userId);
-            return true;
         }       
     }
 } 

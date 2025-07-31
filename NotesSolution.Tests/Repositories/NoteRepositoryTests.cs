@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Moq;
 using NotesSolution.Core.Models;
 using NotesSolution.Infrastructure.Data;
 using NotesSolution.Infrastructure.Repositories;
@@ -24,7 +26,8 @@ namespace NotesSolution.Tests.Repositories
         public async Task CreateAndGet_Note_Success()
         {
             var db = GetDbContext(nameof(CreateAndGet_Note_Success));
-            var repo = new NoteRepository(db);
+            var logger = Mock.Of<ILogger<NoteRepository>>();
+            var repo = new NoteRepository(db, logger);
             var note = new Note { Name = "TestNote", Description = "desc", UserId = "user1" };
             await repo.CreateAsync(note);
             await repo.SaveAsync();
@@ -37,7 +40,8 @@ namespace NotesSolution.Tests.Repositories
         public async Task GetAllAsync_FiltersByUserId_AndPaginates()
         {
             var db = GetDbContext(nameof(GetAllAsync_FiltersByUserId_AndPaginates));
-            var repo = new NoteRepository(db);
+            var logger = Mock.Of<ILogger<NoteRepository>>();
+            var repo = new NoteRepository(db, logger);
             for (int i = 1; i <= 10; i++)
                 await repo.CreateAsync(new Note { Name = $"Note{i}", Description = "desc", UserId = "user1" });
             for (int i = 1; i <= 5; i++)
@@ -54,7 +58,8 @@ namespace NotesSolution.Tests.Repositories
         public async Task GetAllAsync_SearchAndTagFilterAndSort()
         {
             var db = GetDbContext(nameof(GetAllAsync_SearchAndTagFilterAndSort));
-            var repo = new NoteRepository(db);
+            var logger = Mock.Of<ILogger<NoteRepository>>();
+            var repo = new NoteRepository(db, logger);
             var tag = new Tag { Name = "tag1", UserId = "user1" };
             await db.Tags.AddAsync(tag);
             await repo.CreateAsync(new Note { Name = "Alpha", Description = "desc", UserId = "user1", Tags = new List<Tag> { tag } });
@@ -72,7 +77,8 @@ namespace NotesSolution.Tests.Repositories
         public async Task UpdateAsync_ChangesNoteName()
         {
             var db = GetDbContext(nameof(UpdateAsync_ChangesNoteName));
-            var repo = new NoteRepository(db);
+            var logger = Mock.Of<ILogger<NoteRepository>>();
+            var repo = new NoteRepository(db, logger);
             var note = new Note { Name = "Old", Description = "desc", UserId = "user1" };
             await repo.CreateAsync(note);
             await repo.SaveAsync();
@@ -88,7 +94,8 @@ namespace NotesSolution.Tests.Repositories
         public async Task RemoveAsync_DeletesNote()
         {
             var db = GetDbContext(nameof(RemoveAsync_DeletesNote));
-            var repo = new NoteRepository(db);
+            var logger = Mock.Of<ILogger<NoteRepository>>();
+            var repo = new NoteRepository(db, logger);
             var note = new Note { Name = "ToDelete", Description = "desc", UserId = "user1" };
             await repo.CreateAsync(note);
             await repo.SaveAsync();
@@ -101,7 +108,8 @@ namespace NotesSolution.Tests.Repositories
         public async Task ExistsAsync_ReturnsTrueIfExists_AndFalseIfNotExistsOrWrongUser()
         {
             var db = GetDbContext(nameof(ExistsAsync_ReturnsTrueIfExists_AndFalseIfNotExistsOrWrongUser));
-            var repo = new NoteRepository(db);
+            var logger = Mock.Of<ILogger<NoteRepository>>();
+            var repo = new NoteRepository(db, logger);
             var note = new Note { Name = "Exists", Description = "desc", UserId = "user1" };
             await repo.CreateAsync(note);
             await repo.SaveAsync();
