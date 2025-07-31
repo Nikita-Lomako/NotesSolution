@@ -37,12 +37,17 @@ builder.Services.AddScoped<IImageService>(provider =>
 {
     var config = provider.GetRequiredService<IConfiguration>();
     var env = provider.GetRequiredService<IWebHostEnvironment>();
+    var logger = provider.GetRequiredService<ILogger<LocalImageService>>();
     return new LocalImageService(
-        Path.Combine(env.ContentRootPath, config["ImageStorage:Path"]),
-        config["ImageStorage:BaseUrl"]
+        Path.Combine(env.ContentRootPath, config["ImageStorage:Path"] ?? "images"),
+        config["ImageStorage:BaseUrl"] ?? "",
+        logger
     );
 });
 
+
+// Register CancellationTokenProvider
+builder.Services.AddScoped<ICancellationTokenProvider, CancellationTokenProvider>();
 
 // Register NoteRepository
 builder.Services.AddScoped<INoteRepository, NoteRepository>();

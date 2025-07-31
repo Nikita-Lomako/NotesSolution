@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Moq;
 using NotesSolution.Application.Dtos;
 using NotesSolution.Application.Interfaces;
@@ -23,7 +24,9 @@ namespace NotesSolution.Tests.Services
             _authRepositoryMock = new Mock<IAuthRepository>();
             _jwtServiceMock = new Mock<IJwtService>();
             _configurationMock = new Mock<IConfiguration>();
-            _authService = new AuthService(_authRepositoryMock.Object, _configurationMock.Object, _jwtServiceMock.Object);
+            var logger = Mock.Of<ILogger<AuthService>>();
+            var cancellationTokenProvider = Mock.Of<ICancellationTokenProvider>();
+            _authService = new AuthService(_authRepositoryMock.Object, _configurationMock.Object, _jwtServiceMock.Object, logger, cancellationTokenProvider);
         }
 
         [Fact]
@@ -31,13 +34,13 @@ namespace NotesSolution.Tests.Services
         {
             // Arrange
             var user = new Microsoft.AspNetCore.Identity.IdentityUser { UserName = "test", Id = "1" };
-            _authRepositoryMock.Setup(r => r.Login("test", "pass")).ReturnsAsync(user);
+            _authRepositoryMock.Setup(r => r.Login("test", "pass", It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _jwtServiceMock.Setup(j => j.GenerateToken(It.IsAny<IEnumerable<Claim>>())).Returns("token");
 
-            _authRepositoryMock.Setup(r => r.Login("test", "pass", It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            var loginDto = new LoginRequestDto { UserName = "test", Password = "pass" };
 
             // Act
-            var result = await _authService.LoginAsync(loginDto);
+            var result = await _authService.LoginAsync(loginDto, CancellationToken.None);
 
             // Assert
             Assert.NotNull(result);
@@ -49,11 +52,11 @@ namespace NotesSolution.Tests.Services
         public async Task LoginAsync_ReturnsNull_WhenCredentialsAreInvalid()
         {
             // Arrange
-            _authRepositoryMock.Setup(r => r.Login("test", "wrong")).ReturnsAsync((Microsoft.AspNetCore.Identity.IdentityUser?)null);
+            _authRepositoryMock.Setup(r => r.Login("test", "wrong", It.IsAny<CancellationToken>())).ReturnsAsync((Microsoft.AspNetCore.Identity.IdentityUser?)null);
             var loginDto = new LoginRequestDto { UserName = "test", Password = "wrong" };
 
             // Act
-            var result = await _authService.LoginAsync(loginDto);
+            var result = await _authService.LoginAsync(loginDto, CancellationToken.None);
 
             // Assert
             Assert.Null(result);
@@ -63,13 +66,13 @@ namespace NotesSolution.Tests.Services
         public async Task RegisterAsync_ReturnsUserDto_WhenRegistrationIsSuccessful()
         {
             // Arrange
-            _authRepositoryMock.Setup(r => r.FindByNameAsync("newuser")).ReturnsAsync((Microsoft.AspNetCore.Identity.IdentityUser?)null);
+            _authRepositoryMock.Setup(r => r.FindByNameAsync("newuser", It.IsAny<CancellationToken>())).ReturnsAsync((Microsoft.AspNetCore.Identity.IdentityUser?)null);
             var user = new Microsoft.AspNetCore.Identity.IdentityUser { UserName = "newuser", Id = "2" };
-            _authRepositoryMock.Setup(r => r.Register("newuser", "pass")).ReturnsAsync(user);
+            _authRepositoryMock.Setup(r => r.Register("newuser", "pass", It.IsAny<CancellationToken>())).ReturnsAsync(user);
             var regDto = new RegistrationRequestDto { UserName = "newuser", Password = "pass" };
 
             // Act
-            var result = await _authService.RegisterAsync(regDto);
+            var result = await _authService.RegisterAsync(regDto, CancellationToken.None);
 
             // Assert
             Assert.NotNull(result);
@@ -82,11 +85,11 @@ namespace NotesSolution.Tests.Services
         {
             // Arrange
             var user = new Microsoft.AspNetCore.Identity.IdentityUser { UserName = "existing", Id = "3" };
-            _authRepositoryMock.Setup(r => r.FindByNameAsync("existing")).ReturnsAsync(user);
+            _authRepositoryMock.Setup(r => r.FindByNameAsync("existing", It.IsAny<CancellationToken>())).ReturnsAsync(user);
             var regDto = new RegistrationRequestDto { UserName = "existing", Password = "pass" };
 
             // Act
-            var result = await _authService.RegisterAsync(regDto);
+            var result = await _authService.RegisterAsync(regDto, CancellationToken.None);
 
             // Assert
             Assert.Null(result);
