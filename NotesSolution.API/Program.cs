@@ -17,6 +17,7 @@ using NotesSolution.Application.Validation;
 using NotesSolution.Application;
 using NotesSolution.Application.Services;
 using NotesSolution.Application.Interfaces;
+using Microsoft.Extensions.Caching.Distributed;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,6 +32,13 @@ var jwtSecret = builder.Configuration["ApiSettings:Secret"]
 // DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
+
+// Redis Cache
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration["Redis:Configuration"];
+    options.InstanceName = "NotesSolution_";
+});
 
 
 builder.Services.AddScoped<IImageService>(provider =>
@@ -160,6 +168,21 @@ app.UseHttpsRedirection();
 app.MapNoteEndpoints();
 app.MapTagEndpoints();
 app.MapAuthEndpoints();
+
+
+// Fail-safe for Redis
+try
+{
+    var redis = app.Services.GetRequiredService<IDistributedCache>();
+    using var _ = redis.GetStringAsync("test");
+}
+catch (Exception ex)
+{
+    // If Redis is not available, we can log it and continue without caching
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogWarning(ex, "Redis is not available. Caching is disabled.");
+}
+
 
 using (var scope = app.Services.CreateScope())
 {

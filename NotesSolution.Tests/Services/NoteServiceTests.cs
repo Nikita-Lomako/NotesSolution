@@ -40,6 +40,7 @@ namespace NotesSolution.Tests.Services
             _mockUpdateValidator = new Mock<IValidator<NoteUpdateDto>>();
             _mockLogger = new Mock<ILogger<NoteService>>();
             _mockTagHelperService = new Mock<ITagHelperService>();
+            var mockCache = new Mock<Microsoft.Extensions.Caching.Distributed.IDistributedCache>();
 
             var mockCancellationTokenProvider = new Mock<ICancellationTokenProvider>();
             _noteService = new NoteService(
@@ -51,7 +52,8 @@ namespace NotesSolution.Tests.Services
                 _mockUpdateValidator.Object,
                 _mockLogger.Object,
                 _mockTagHelperService.Object,
-                mockCancellationTokenProvider.Object
+                mockCancellationTokenProvider.Object,
+                mockCache.Object
             );
         }
 
@@ -65,9 +67,9 @@ namespace NotesSolution.Tests.Services
                 new Note { Id = Guid.NewGuid(), Name = "Note2", UserId = userId }
             };
             var noteDtos = notes.Select(n => new NoteDto { Id = n.Id, Name = n.Name }).ToList();
-            _mockNoteRepository.Setup(r => r.GetAllAsync(userId, null, null, null, null, 1, 10, It.IsAny<CancellationToken>())).ReturnsAsync(notes);
+            _mockNoteRepository.Setup(r => r.GetAllAsync(userId, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), 1, 10, It.IsAny<CancellationToken>())).ReturnsAsync(notes);
             _mockMapper.Setup(m => m.Map<List<NoteDto>>(notes)).Returns(noteDtos);
-            var result = await _noteService.GetAllNotes(userId, null, null, null, null, 1, 10, CancellationToken.None);
+            var result = await _noteService.GetAllNotes(userId, string.Empty, string.Empty, string.Empty, string.Empty, 1, 10, CancellationToken.None);
             Assert.Equal(2, result.Count);
         }
 
@@ -102,7 +104,7 @@ namespace NotesSolution.Tests.Services
             var noteDto = new NoteCreateDto { Name = "Test", Description = "Test", Tags = new List<string>() };
             var validationErrors = new List<ValidationFailure> { new ValidationFailure("Name", "Name is required") };
             _mockCreateValidator.Setup(v => v.ValidateAsync(noteDto, It.IsAny<CancellationToken>())).ReturnsAsync(new ValidationResult(validationErrors));
-            var result = await _noteService.CreateNote(userId, noteDto, null, CancellationToken.None);
+            var result = await _noteService.CreateNote(userId, noteDto, new FormFileCollection(), CancellationToken.None);
             var (note, errors) = result;
             Assert.Null(note);
             Assert.Single(errors);
@@ -136,7 +138,7 @@ namespace NotesSolution.Tests.Services
             var noteDto = new NoteUpdateDto { Name = "Updated", Description = "Updated", Tags = new List<string>() };
             _mockUpdateValidator.Setup(v => v.ValidateAsync(noteDto, It.IsAny<CancellationToken>())).ReturnsAsync(new ValidationResult());
             _mockNoteRepository.Setup(r => r.GetAsync(userId, noteId, It.IsAny<CancellationToken>())).ReturnsAsync((Note?)null);
-            var result = await _noteService.UpdateNote(userId, noteId, noteDto, null, CancellationToken.None);
+            var result = await _noteService.UpdateNote(userId, noteId, noteDto, new FormFileCollection(), CancellationToken.None);
             var (updatedNote, errors, notFound) = result;
             Assert.Null(updatedNote);
             Assert.True(notFound);

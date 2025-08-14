@@ -10,6 +10,8 @@ using AutoMapper;
 using FluentValidation;
 using Microsoft.Extensions.Logging;
 using NotesSolution.Application.Interfaces;
+using Microsoft.Extensions.Caching.Distributed;
+using System.Text.Json;
 
 namespace NotesSolution.Application.Services
 {
@@ -21,6 +23,7 @@ namespace NotesSolution.Application.Services
         private readonly IValidator<TagRequestDto> _validator;
         private readonly ILogger<TagService> _logger;
         private readonly ICancellationTokenProvider _cancellationTokenProvider;
+        private readonly IDistributedCache _cache;
 
         public TagService(
             ITagRepository tagRepository,
@@ -28,7 +31,8 @@ namespace NotesSolution.Application.Services
             IMapper mapper,
             IValidator<TagRequestDto> validator,
             ILogger<TagService> logger,
-            ICancellationTokenProvider cancellationTokenProvider)
+            ICancellationTokenProvider cancellationTokenProvider,
+            IDistributedCache cache)
         {
             _tagRepository = tagRepository;
             _noteRepository = noteRepository;
@@ -36,28 +40,69 @@ namespace NotesSolution.Application.Services
             _validator = validator;
             _logger = logger;
             _cancellationTokenProvider = cancellationTokenProvider;
+            _cache = cache;
         }
 
         public async Task<List<TagDto>> GetAllTags(string userId, CancellationToken cancellationToken = default)
         {
+            var cacheKey = $"tags_{userId}";
+            string? cachedTagsJson = null;
+
+            try
+            {
+                cachedTagsJson = await _cache.GetStringAsync(cacheKey, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to access Redis cache. Caching is disabled for this request.");
+            }
+
+            if (!string.IsNullOrEmpty(cachedTagsJson))
+            {
+                _logger.LogInformation("Cache hit for tags for user {UserId}", userId);
+                var tags = JsonSerializer.Deserialize<List<TagDto>>(cachedTagsJson);
+                if (tags is not null)
+                {
+                    return tags;
+                }
+            }
+
+            _logger.LogInformation("Cache miss for tags for user {UserId}", userId);
             try
             {
                 using var timeoutTokenSource = _cancellationTokenProvider.CreateTimeoutTokenSource(15000); // 15 seconds timeout
                 using var linkedTokenSource = _cancellationTokenProvider.CreateLinkedTokenSource(
-                    cancellationToken, 
-                    timeoutTokenSource.Token, 
+                    cancellationToken,
+                    timeoutTokenSource.Token,
                     _cancellationTokenProvider.GetDefaultToken());
 
                 var combinedToken = linkedTokenSource.Token;
 
                 _logger.LogInformation("Getting all tags for user {UserId}", userId);
-                
+
                 // Check cancellation before database operation
                 combinedToken.ThrowIfCancellationRequested();
-                
+
                 var tags = await _tagRepository.GetAllAsync(userId, combinedToken);
                 _logger.LogInformation("Found {Count} tags for user {UserId}", tags.Count, userId);
-                return _mapper.Map<List<TagDto>>(tags);
+                var tagDtos = _mapper.Map<List<TagDto>>(tags);
+
+                var tagsJson = JsonSerializer.Serialize(tagDtos);
+                var cacheOptions = new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
+                };
+
+                try
+                {
+                    await _cache.SetStringAsync(cacheKey, tagsJson, cacheOptions, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to write to Redis cache. Caching is disabled for this request.");
+                }
+
+                return tagDtos;
             }
             catch (OperationCanceledException)
             {
@@ -73,21 +118,44 @@ namespace NotesSolution.Application.Services
 
         public async Task<TagDto?> GetTagById(string userId, Guid id, CancellationToken cancellationToken = default)
         {
+            var cacheKey = $"tag_{userId}_{id}";
+            string? cachedTagJson = null;
+
+            try
+            {
+                cachedTagJson = await _cache.GetStringAsync(cacheKey, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to access Redis cache. Caching is disabled for this request.");
+            }
+
+            if (!string.IsNullOrEmpty(cachedTagJson))
+            {
+                _logger.LogInformation("Cache hit for tag with id {Id}", id);
+                var cachedTag = JsonSerializer.Deserialize<TagDto>(cachedTagJson);
+                if (cachedTag is not null)
+                {
+                    return cachedTag;
+                }
+            }
+
+            _logger.LogInformation("Cache miss for tag with id {Id}", id);
             try
             {
                 using var timeoutTokenSource = _cancellationTokenProvider.CreateTimeoutTokenSource(10000); // 10 seconds timeout
                 using var linkedTokenSource = _cancellationTokenProvider.CreateLinkedTokenSource(
-                    cancellationToken, 
-                    timeoutTokenSource.Token, 
+                    cancellationToken,
+                    timeoutTokenSource.Token,
                     _cancellationTokenProvider.GetDefaultToken());
 
                 var combinedToken = linkedTokenSource.Token;
 
                 _logger.LogInformation("Getting tag with id = {Id} for user {UserId}", id, userId);
-                
+
                 // Check cancellation before database operation
                 combinedToken.ThrowIfCancellationRequested();
-                
+
                 var tag = await GetUserTagByIdAsync(userId, id, combinedToken);
                 if (tag == null)
                 {
@@ -95,7 +163,24 @@ namespace NotesSolution.Application.Services
                     return null;
                 }
                 _logger.LogInformation("Tag with id {Id} found for user {UserId}", id, userId);
-                return _mapper.Map<TagDto>(tag);
+                var tagDto = _mapper.Map<TagDto>(tag);
+
+                var tagJson = JsonSerializer.Serialize(tagDto);
+                var cacheOptions = new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
+                };
+
+                try
+                {
+                    await _cache.SetStringAsync(cacheKey, tagJson, cacheOptions, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to write to Redis cache. Caching is disabled for this request.");
+                }
+
+                return tagDto;
             }
             catch (OperationCanceledException)
             {
@@ -111,21 +196,44 @@ namespace NotesSolution.Application.Services
 
         public async Task<TagDto?> GetTagByName(string userId, string name, CancellationToken cancellationToken = default)
         {
+            var cacheKey = $"tag_{userId}_{name}";
+            string? cachedTagJson = null;
+
+            try
+            {
+                cachedTagJson = await _cache.GetStringAsync(cacheKey, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to access Redis cache. Caching is disabled for this request.");
+            }
+
+            if (!string.IsNullOrEmpty(cachedTagJson))
+            {
+                _logger.LogInformation("Cache hit for tag with name {Name}", name);
+                var tag = JsonSerializer.Deserialize<TagDto>(cachedTagJson);
+                if (tag is not null)
+                {
+                    return tag;
+                }
+            }
+
+            _logger.LogInformation("Cache miss for tag with name {Name}", name);
             try
             {
                 using var timeoutTokenSource = _cancellationTokenProvider.CreateTimeoutTokenSource(10000); // 10 seconds timeout
                 using var linkedTokenSource = _cancellationTokenProvider.CreateLinkedTokenSource(
-                    cancellationToken, 
-                    timeoutTokenSource.Token, 
+                    cancellationToken,
+                    timeoutTokenSource.Token,
                     _cancellationTokenProvider.GetDefaultToken());
 
                 var combinedToken = linkedTokenSource.Token;
 
                 _logger.LogInformation("Getting tag with name = {Name} for user {UserId}", name, userId);
-                
+
                 // Check cancellation before database operation
                 combinedToken.ThrowIfCancellationRequested();
-                
+
                 var tag = await GetUserTagByNameAsync(userId, name, combinedToken);
                 if (tag == null)
                 {
@@ -133,7 +241,24 @@ namespace NotesSolution.Application.Services
                     return null;
                 }
                 _logger.LogInformation("Tag with name {Name} found for user {UserId}", name, userId);
-                return _mapper.Map<TagDto>(tag);
+                var tagDto = _mapper.Map<TagDto>(tag);
+
+                var tagJson = JsonSerializer.Serialize(tagDto);
+                var cacheOptions = new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
+                };
+
+                try
+                {
+                    await _cache.SetStringAsync(cacheKey, tagJson, cacheOptions, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to write to Redis cache. Caching is disabled for this request.");
+                }
+
+                return tagDto;
             }
             catch (OperationCanceledException)
             {
@@ -252,6 +377,18 @@ namespace NotesSolution.Application.Services
                 combinedToken.ThrowIfCancellationRequested();
                 
                 await _tagRepository.UpdateAsync(existingTag, combinedToken);
+
+                var cacheKey = $"tag_{userId}_{id}";
+                try
+                {
+                    await _cache.RemoveAsync(cacheKey, cancellationToken);
+                    _logger.LogInformation("Cache invalidated for tag with id {Id}", id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to invalidate cache for tag {Id}", id);
+                }
+
                 _logger.LogInformation("Updated tag with id {Id} for user {UserId}", id, userId);
                 return (_mapper.Map<TagDto>(existingTag), new List<string>(), false, false);
             }
@@ -300,6 +437,18 @@ namespace NotesSolution.Application.Services
                 combinedToken.ThrowIfCancellationRequested();
                 
                 await _tagRepository.RemoveAsync(tag, combinedToken);
+
+                var cacheKey = $"tag_{userId}_{id}";
+                try
+                {
+                    await _cache.RemoveAsync(cacheKey, cancellationToken);
+                    _logger.LogInformation("Cache invalidated for tag with id {Id}", id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to invalidate cache for tag {Id}", id);
+                }
+
                 _logger.LogInformation("Deleted tag with id {Id} for user {UserId}", id, userId);
                 return true;
             }
