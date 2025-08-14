@@ -22,6 +22,7 @@ services:
       - ImageStorage__BaseUrl=https://localhost:8081/images
       - ApiSettings__Secret=${JWT_SECRET}
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=notesdb;Username=postgres;Password=${DB_PASSWORD}
+      - Redis__Configuration=redis:6379,password=${REDIS_PASSWORD}
       - ASPNETCORE_HTTP_PORTS=8080
       - ASPNETCORE_HTTPS_PORTS=8081
     ports:
@@ -30,5 +31,16 @@ services:
     volumes:
       - ./app-images:/app/images
 
+  redis:
+    image: redis:latest
+    container_name: notes_redis
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
 volumes:
   pgdata:
+  redisdata:

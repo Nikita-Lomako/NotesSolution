@@ -34,7 +34,6 @@ namespace NotesSolution.Tests.Validation
         [Theory]
         [InlineData("")]
         [InlineData("   ")]
-        [InlineData(null)]
         public void Should_Fail_When_Name_Is_Empty_Or_Null(string name)
         {
             // Arrange
@@ -42,6 +41,23 @@ namespace NotesSolution.Tests.Validation
             {
                 Id = Guid.NewGuid(),
                 Name = name
+            };
+
+            // Act
+            var result = _validator.TestValidate(dto);
+
+            // Assert
+            result.ShouldHaveValidationErrorFor(x => x.Name);
+        }
+
+        [Fact]
+        public void Should_Fail_When_Name_Is_Null()
+        {
+            // Arrange
+            var dto = new TagDto
+            {
+                Id = Guid.NewGuid(),
+                Name = null!
             };
 
             // Act
