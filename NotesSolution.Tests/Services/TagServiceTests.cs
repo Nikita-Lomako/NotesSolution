@@ -35,13 +35,15 @@ namespace NotesSolution.Tests.Services
             _mockLogger = new Mock<ILogger<TagService>>();
 
             var mockCancellationTokenProvider = new Mock<ICancellationTokenProvider>();
+            var mockCache = new Mock<Microsoft.Extensions.Caching.Distributed.IDistributedCache>();
             _tagService = new TagService(
                 _mockTagRepository.Object,
                 _mockNoteRepository.Object,
                 _mockMapper.Object,
                 _mockValidator.Object,
                 _mockLogger.Object,
-                mockCancellationTokenProvider.Object
+                mockCancellationTokenProvider.Object,
+                mockCache.Object
             );
         }
 
@@ -210,7 +212,7 @@ namespace NotesSolution.Tests.Services
             var tag = new Tag { Id = tagId, Name = "Test Tag", UserId = userId };
             _mockTagRepository.Setup(r => r.GetAsync(userId, tagId, It.IsAny<CancellationToken>())).ReturnsAsync(tag);
             _mockTagRepository.Setup(r => r.RemoveAsync(tag, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-            _mockNoteRepository.Setup(r => r.GetAllAsync(userId, null, null, null, null, 1, int.MaxValue, It.IsAny<CancellationToken>())).ReturnsAsync(new List<Note>());
+            _mockNoteRepository.Setup(r => r.GetAllAsync(userId, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), 1, int.MaxValue, It.IsAny<CancellationToken>())).ReturnsAsync(new List<Note>());
             var result = await _tagService.DeleteTag(userId, tagId, CancellationToken.None);
             Assert.True(result);
             _mockTagRepository.Verify(r => r.RemoveAsync(tag, It.IsAny<CancellationToken>()), Times.Once);

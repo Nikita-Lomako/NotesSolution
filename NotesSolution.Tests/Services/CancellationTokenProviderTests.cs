@@ -41,7 +41,7 @@ namespace NotesSolution.Tests.Services
         public void GetDefaultToken_WhenHttpContextIsNull_ReturnsNoneToken()
         {
             // Arrange
-            _httpContextAccessorMock.Setup(x => x.HttpContext).Returns((HttpContext)null);
+            _httpContextAccessorMock.Setup(x => x.HttpContext).Returns(value: null);
 
             // Act
             var result = _provider.GetDefaultToken();

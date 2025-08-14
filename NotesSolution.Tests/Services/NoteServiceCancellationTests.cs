@@ -38,6 +38,7 @@ namespace NotesSolution.Tests.Services
             _loggerMock = new Mock<ILogger<NoteService>>();
             _tagHelperServiceMock = new Mock<ITagHelperService>();
             _cancellationTokenProviderMock = new Mock<ICancellationTokenProvider>();
+            var mockCache = new Mock<Microsoft.Extensions.Caching.Distributed.IDistributedCache>();
 
             _noteService = new NoteService(
                 _noteRepositoryMock.Object,
@@ -48,7 +49,8 @@ namespace NotesSolution.Tests.Services
                 _updateValidatorMock.Object,
                 _loggerMock.Object,
                 _tagHelperServiceMock.Object,
-                _cancellationTokenProviderMock.Object);
+                _cancellationTokenProviderMock.Object,
+                mockCache.Object);
         }
 
         [Fact]
@@ -71,7 +73,7 @@ namespace NotesSolution.Tests.Services
             await Assert.ThrowsAsync<OperationCanceledException>(async () =>
             {
                 cancellationTokenSource.Cancel();
-                await _noteService.GetAllNotes(userId, null, null, null, null, 1, 10, cancellationTokenSource.Token);
+                await _noteService.GetAllNotes(userId, string.Empty, string.Empty, string.Empty, string.Empty, 1, 10, cancellationTokenSource.Token);
             });
         }
 
@@ -93,7 +95,7 @@ namespace NotesSolution.Tests.Services
             // Act & Assert
             await Assert.ThrowsAsync<OperationCanceledException>(async () =>
             {
-                await _noteService.GetAllNotes(userId, null, null, null, null, 1, 10);
+                await _noteService.GetAllNotes(userId, string.Empty, string.Empty, string.Empty, string.Empty, 1, 10);
                 await Task.Delay(200); // Wait for timeout
             });
         }
@@ -115,13 +117,13 @@ namespace NotesSolution.Tests.Services
             _cancellationTokenProviderMock.Setup(x => x.GetDefaultToken())
                 .Returns(CancellationToken.None);
 
-            _noteRepositoryMock.Setup(x => x.GetAllAsync(userId, null, null, null, null, 1, 10, It.IsAny<CancellationToken>()))
+            _noteRepositoryMock.Setup(x => x.GetAllAsync(userId, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), 1, 10, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(notes);
             _mapperMock.Setup(x => x.Map<List<NoteDto>>(notes))
                 .Returns(noteDtos);
 
             // Act
-            var result = await _noteService.GetAllNotes(userId, null, null, null, null, 1, 10);
+            var result = await _noteService.GetAllNotes(userId, string.Empty, string.Empty, string.Empty, string.Empty, 1, 10);
 
             // Assert
             Assert.NotNull(result);
@@ -150,7 +152,7 @@ namespace NotesSolution.Tests.Services
                 .ThrowsAsync(new OperationCanceledException());
 
             // Act
-            var (note, errors) = await _noteService.CreateNote(userId, noteDto, null, cancellationTokenSource.Token);
+            var (note, errors) = await _noteService.CreateNote(userId, noteDto, new FormFileCollection(), cancellationTokenSource.Token);
 
             // Assert
             Assert.Null(note);

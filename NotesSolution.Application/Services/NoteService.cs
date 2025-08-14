@@ -11,7 +11,9 @@ using NotesSolution.Core.Interfaces;
 using AutoMapper;
 using FluentValidation;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Caching.Distributed;
 using NotesSolution.Application.Interfaces;
+using System.Text.Json;
 
 namespace NotesSolution.Application.Services
 {
@@ -26,6 +28,7 @@ namespace NotesSolution.Application.Services
         private readonly ILogger<NoteService> _logger;
         private readonly ITagHelperService _tagHelperService;
         private readonly ICancellationTokenProvider _cancellationTokenProvider;
+        private readonly IDistributedCache _cache;
 
         public NoteService(
             INoteRepository noteRepository,
@@ -36,7 +39,8 @@ namespace NotesSolution.Application.Services
             IValidator<NoteUpdateDto> updateValidator,
             ILogger<NoteService> logger,
             ITagHelperService tagHelperService,
-            ICancellationTokenProvider cancellationTokenProvider)
+            ICancellationTokenProvider cancellationTokenProvider,
+            IDistributedCache cache)
         {
             _noteRepository = noteRepository;
             _tagRepository = tagRepository;
@@ -47,31 +51,68 @@ namespace NotesSolution.Application.Services
             _logger = logger;
             _tagHelperService = tagHelperService;
             _cancellationTokenProvider = cancellationTokenProvider;
+            _cache = cache;
         }
 
         public async Task<List<NoteDto>> GetAllNotes(string userId, string? search, string? tag, string? sort, string? order, int page, int pageSize, CancellationToken cancellationToken = default)
         {
+            var cacheKey = $"notes_{userId}_{search}_{tag}_{sort}_{order}_{page}_{pageSize}";
+            string? cachedNotesJson = null;
+
+            try
+            {
+                cachedNotesJson = await _cache.GetStringAsync(cacheKey, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to access Redis cache. Caching is disabled for this request.");
+            }
+
+            if (!string.IsNullOrEmpty(cachedNotesJson))
+            {
+                _logger.LogInformation("Cache hit for key: {CacheKey}", cacheKey);
+                return JsonSerializer.Deserialize<List<NoteDto>>(cachedNotesJson);
+            }
+
+            _logger.LogInformation("Cache miss for key: {CacheKey}", cacheKey);
             try
             {
                 // Use linked token source to combine request token with timeout
                 using var timeoutTokenSource = _cancellationTokenProvider.CreateTimeoutTokenSource(30000); // 30 seconds timeout
                 using var linkedTokenSource = _cancellationTokenProvider.CreateLinkedTokenSource(
-                    cancellationToken, 
-                    timeoutTokenSource.Token, 
+                    cancellationToken,
+                    timeoutTokenSource.Token,
                     _cancellationTokenProvider.GetDefaultToken());
 
                 var combinedToken = linkedTokenSource.Token;
 
-                _logger.LogInformation("Getting all notes for user {UserId} with search={Search}, tag={Tag}, sort={Sort}, order={Order}, page={Page}, pageSize={PageSize}", 
+                _logger.LogInformation("Getting all notes for user {UserId} with search={Search}, tag={Tag}, sort={Sort}, order={Order}, page={Page}, pageSize={PageSize}",
                     userId, search, tag, sort, order, page, pageSize);
 
                 // Check cancellation before database operation
                 combinedToken.ThrowIfCancellationRequested();
 
                 var notes = await _noteRepository.GetAllAsync(userId, search, tag, sort, order, page, pageSize, combinedToken);
-                
+
                 _logger.LogInformation("Found {Count} notes for user {UserId}", notes.Count, userId);
-                return _mapper.Map<List<NoteDto>>(notes);
+                var noteDtos = _mapper.Map<List<NoteDto>>(notes);
+
+                var notesJson = JsonSerializer.Serialize(noteDtos);
+                var cacheOptions = new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
+                };
+
+                try
+                {
+                    await _cache.SetStringAsync(cacheKey, notesJson, cacheOptions, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to write to Redis cache. Caching is disabled for this request.");
+                }
+
+                return noteDtos;
             }
             catch (OperationCanceledException)
             {
@@ -109,6 +150,29 @@ namespace NotesSolution.Application.Services
 
         public async Task<NoteDto?> GetNoteById(string userId, Guid id, CancellationToken cancellationToken = default)
         {
+            var cacheKey = $"note_{userId}_{id}";
+            string? cachedNoteJson = null;
+
+            try
+            {
+                cachedNoteJson = await _cache.GetStringAsync(cacheKey, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to access Redis cache. Caching is disabled for this request.");
+            }
+
+            if (!string.IsNullOrEmpty(cachedNoteJson))
+            {
+                _logger.LogInformation("Cache hit for note with id {Id}", id);
+                var cachedNote = JsonSerializer.Deserialize<NoteDto>(cachedNoteJson);
+                if (cachedNote is not null)
+                {
+                    return cachedNote;
+                }
+            }
+
+            _logger.LogInformation("Cache miss for note with id {Id}", id);
             try
             {
                 _logger.LogInformation("Getting note with id = {Id} for user {UserId}", id, userId);
@@ -119,7 +183,24 @@ namespace NotesSolution.Application.Services
                     return null;
                 }
                 _logger.LogInformation("Note with id {Id} found for user {UserId}", id, userId);
-                return _mapper.Map<NoteDto>(note);
+                var noteDto = _mapper.Map<NoteDto>(note);
+
+                var noteJson = JsonSerializer.Serialize(noteDto);
+                var cacheOptions = new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
+                };
+
+                try
+                {
+                    await _cache.SetStringAsync(cacheKey, noteJson, cacheOptions, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to write to Redis cache. Caching is disabled for this request.");
+                }
+
+                return noteDto;
             }
             catch (OperationCanceledException)
             {
@@ -287,6 +368,17 @@ namespace NotesSolution.Application.Services
                 combinedToken.ThrowIfCancellationRequested();
                 await _noteRepository.UpdateAsync(existingNote, combinedToken);
                 await _noteRepository.SaveAsync(combinedToken);
+
+                var cacheKey = $"note_{userId}_{id}";
+                try
+                {
+                    await _cache.RemoveAsync(cacheKey, cancellationToken);
+                    _logger.LogInformation("Cache invalidated for note with id {Id}", id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to invalidate cache for note {Id}", id);
+                }
                 
                 _logger.LogInformation("Updated note with id {Id} for user {UserId}", id, userId);
                 return (_mapper.Map<NoteDto>(existingNote), new List<string>(), false);
@@ -334,6 +426,17 @@ namespace NotesSolution.Application.Services
                 // Check cancellation before database operation
                 combinedToken.ThrowIfCancellationRequested();
                 await _noteRepository.RemoveAsync(existingNote, combinedToken);
+
+                var cacheKey = $"note_{userId}_{id}";
+                try
+                {
+                    await _cache.RemoveAsync(cacheKey, cancellationToken);
+                    _logger.LogInformation("Cache invalidated for note with id {Id}", id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to invalidate cache for note {Id}", id);
+                }
                 
                 // Safely delete images after successful database operation
                 foreach (var imageUrl in imageUrls)
