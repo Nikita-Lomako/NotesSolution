@@ -43,3 +43,8 @@ JWT-аутентификация и авторизация
 Контакты
 Автор: Nikita Lomako
 Email: nikita_lomako06@mail.ru
+```
+JWT_SECRET=your_jwt_secret
+DB_PASSWORD=your_db_password
+REDIS_PASSWORD=your_redis_password
+```
