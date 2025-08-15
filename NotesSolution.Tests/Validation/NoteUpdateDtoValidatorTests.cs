@@ -253,8 +253,8 @@ namespace NotesSolution.Tests.Validation
                 Name = "My Updated Important Note",
                 Description = "This is an updated detailed description with special characters: !@#$%^&*() and numbers 1234567890",
                 Tags = new List<string> { "important", "work", "project", "deadline", "updated" },
-                ImageUrls = new List<string> 
-                { 
+                ImageUrls = new List<string>
+                {
                     "https://example.com/updated-image1.jpg",
                     "https://example.com/updated-image2.png",
                     "https://example.com/updated-image3.gif"
@@ -287,4 +287,4 @@ namespace NotesSolution.Tests.Validation
             result.ShouldNotHaveAnyValidationErrors();
         }
     }
-} 
+}

@@ -15,4 +15,4 @@ namespace NotesSolution.Application.Interfaces
         Task<(TagDto? tag, List<string> errors, bool notFound, bool conflict)> UpdateTag(string userId, Guid id, TagRequestDto tagDto, CancellationToken cancellationToken = default);
         Task<bool> DeleteTag(string userId, Guid id, CancellationToken cancellationToken = default);
     }
-}  
+}

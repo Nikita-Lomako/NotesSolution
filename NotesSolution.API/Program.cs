@@ -1,23 +1,23 @@
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.FileProviders;
-using NotesSolution.Core.Interfaces;
-using NotesSolution.Infrastructure.Data;
-using NotesSolution.Infrastructure.Services;
-using NotesSolution.Core.Interfaces.IRepositories;
-using NotesSolution.Infrastructure.Repositories;
-using FluentValidation;
-using NotesSolution.API.Endpoints;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using Microsoft.OpenApi.Models;
-using NotesSolution.Application.Dtos;
-using NotesSolution.Application.Validation;
-using NotesSolution.Application;
-using NotesSolution.Application.Services;
-using NotesSolution.Application.Interfaces;
+using FluentValidation;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using NotesSolution.API.Endpoints;
+using NotesSolution.Application;
+using NotesSolution.Application.Dtos;
+using NotesSolution.Application.Interfaces;
+using NotesSolution.Application.Services;
+using NotesSolution.Application.Validation;
+using NotesSolution.Core.Interfaces;
+using NotesSolution.Core.Interfaces.IRepositories;
+using NotesSolution.Infrastructure.Data;
+using NotesSolution.Infrastructure.Repositories;
+using NotesSolution.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -187,7 +187,7 @@ catch (Exception ex)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate(); 
+    db.Database.Migrate();
 }
 
 app.Run();

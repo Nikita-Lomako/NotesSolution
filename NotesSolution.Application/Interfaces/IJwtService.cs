@@ -7,4 +7,4 @@ namespace NotesSolution.Application.Interfaces
     {
         string GenerateToken(IEnumerable<Claim> claims);
     }
-} 
+}

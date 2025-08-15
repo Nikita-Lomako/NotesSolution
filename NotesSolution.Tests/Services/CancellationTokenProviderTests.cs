@@ -1,9 +1,9 @@
+using System.Threading;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Moq;
-using NotesSolution.Application.Services;
 using NotesSolution.Application.Interfaces;
-using System.Threading;
+using NotesSolution.Application.Services;
 using Xunit;
 
 namespace NotesSolution.Tests.Services
@@ -105,16 +105,16 @@ namespace NotesSolution.Tests.Services
         }
 
         [Fact]
-        public void CreateTimeoutTokenSource_TokenExpiresAfterTimeout()
+        public async Task CreateTimeoutTokenSource_TokenExpiresAfterTimeout()
         {
             // Arrange
             var timeoutMs = 100; // 100ms timeout
 
             // Act
             using var tokenSource = _provider.CreateTimeoutTokenSource(timeoutMs);
-            
+
             // Wait for timeout
-            Thread.Sleep(200);
+            await Task.Delay(200);
 
             // Assert
             Assert.True(tokenSource.Token.IsCancellationRequested);
@@ -129,7 +129,7 @@ namespace NotesSolution.Tests.Services
 
             // Act
             using var linkedTokenSource = _provider.CreateLinkedTokenSource(tokenSource1.Token, tokenSource2.Token);
-            
+
             // Cancel one of the tokens
             tokenSource1.Cancel();
 
@@ -176,4 +176,4 @@ namespace NotesSolution.Tests.Services
             Assert.False(result.Token.IsCancellationRequested);
         }
     }
-} 
+}

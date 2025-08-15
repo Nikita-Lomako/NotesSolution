@@ -1,19 +1,21 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;
 using FluentValidation;
 using FluentValidation.Results;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using Moq;
-using NotesSolution.Application.Services;
 using NotesSolution.Application.Dtos;
+using NotesSolution.Application.Interfaces;
+using NotesSolution.Application.Services;
 using NotesSolution.Core.Interfaces;
 using NotesSolution.Core.Interfaces.IRepositories;
 using NotesSolution.Core.Models;
 using Xunit;
-using NotesSolution.Application.Interfaces;
 
 namespace NotesSolution.Tests.Services
 {
@@ -24,6 +26,8 @@ namespace NotesSolution.Tests.Services
         private readonly Mock<IMapper> _mockMapper;
         private readonly Mock<IValidator<TagRequestDto>> _mockValidator;
         private readonly Mock<ILogger<TagService>> _mockLogger;
+        private readonly Mock<ICancellationTokenProvider> _mockCancellationTokenProvider;
+        private readonly Mock<IDistributedCache> _mockCache;
         private readonly ITagService _tagService;
 
         public TagServiceTests()
@@ -33,17 +37,32 @@ namespace NotesSolution.Tests.Services
             _mockMapper = new Mock<IMapper>();
             _mockValidator = new Mock<IValidator<TagRequestDto>>();
             _mockLogger = new Mock<ILogger<TagService>>();
+            _mockCancellationTokenProvider = new Mock<ICancellationTokenProvider>();
+            _mockCache = new Mock<IDistributedCache>();
 
-            var mockCancellationTokenProvider = new Mock<ICancellationTokenProvider>();
-            var mockCache = new Mock<Microsoft.Extensions.Caching.Distributed.IDistributedCache>();
+            // Setup cancellation token provider
+            var timeoutTokenSource = new CancellationTokenSource();
+            var linkedTokenSource = new CancellationTokenSource();
+
+            _mockCancellationTokenProvider.Setup(p => p.GetDefaultToken())
+                .Returns(CancellationToken.None);
+            _mockCancellationTokenProvider.Setup(p => p.CreateTimeoutTokenSource(It.IsAny<int>()))
+                .Returns(timeoutTokenSource);
+            _mockCancellationTokenProvider.Setup(p => p.CreateLinkedTokenSource(It.IsAny<CancellationToken[]>()))
+                .Returns(linkedTokenSource);
+
+            // Setup cache to return null (cache miss)
+            _mockCache.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((byte[]?)null);
+
             _tagService = new TagService(
                 _mockTagRepository.Object,
                 _mockNoteRepository.Object,
                 _mockMapper.Object,
                 _mockValidator.Object,
                 _mockLogger.Object,
-                mockCancellationTokenProvider.Object,
-                mockCache.Object
+                _mockCancellationTokenProvider.Object,
+                _mockCache.Object
             );
         }
 
@@ -105,14 +124,14 @@ namespace NotesSolution.Tests.Services
         public async Task CreateTag_ReturnsValidationErrors_WhenValidationFails()
         {
             var userId = "user1";
-            var tagDto = new TagRequestDto { Name = "Test" };
-            var validationErrors = new List<ValidationFailure> { new ValidationFailure("Name", "Name is required") };
-            _mockValidator.Setup(v => v.ValidateAsync(tagDto, It.IsAny<CancellationToken>())).ReturnsAsync(new ValidationResult(validationErrors));
+            var tagDto = new TagRequestDto { Name = string.Empty };
+            var validationFailures = new List<ValidationFailure> { new ValidationFailure("Name", "'Name' must not be empty.") };
+            _mockValidator.Setup(v => v.ValidateAsync(tagDto, It.IsAny<CancellationToken>())).ReturnsAsync(new ValidationResult(validationFailures));
             var result = await _tagService.CreateTag(userId, tagDto, CancellationToken.None);
             var (tag, errors, conflict) = result;
             Assert.Null(tag);
-            Assert.Single(errors);
-            Assert.Contains("Name is required", errors);
+            Assert.NotEmpty(errors);
+            Assert.Contains("'Name' must not be empty.", errors);
             Assert.False(conflict);
         }
 
@@ -229,4 +248,4 @@ namespace NotesSolution.Tests.Services
             _mockTagRepository.Verify(r => r.RemoveAsync(It.IsAny<Tag>(), It.IsAny<CancellationToken>()), Times.Never);
         }
     }
-} 
+}

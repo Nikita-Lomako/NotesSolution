@@ -1,9 +1,9 @@
+using System.Threading;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using NotesSolution.Core.Interfaces.IRepositories;
 using NotesSolution.Core.Models;
 using NotesSolution.Infrastructure.Data;
-using Microsoft.EntityFrameworkCore;
-using System.Threading;
-using Microsoft.Extensions.Logging;
 
 namespace NotesSolution.Infrastructure.Repositories
 {
@@ -24,8 +24,8 @@ namespace NotesSolution.Infrastructure.Repositories
             {
                 // Check cancellation before starting database query
                 cancellationToken.ThrowIfCancellationRequested();
-                
-                _logger.LogDebug("Getting notes for user {UserId} with search={Search}, tag={Tag}, sort={Sort}, order={Order}, page={Page}, pageSize={PageSize}", 
+
+                _logger.LogDebug("Getting notes for user {UserId} with search={Search}, tag={Tag}, sort={Sort}, order={Order}, page={Page}, pageSize={PageSize}",
                     userId, search, tag, sort, order, page, pageSize);
 
                 var query = _db.Notes.Include(n => n.Tags).Where(n => n.UserId == userId).AsQueryable();
@@ -45,13 +45,13 @@ namespace NotesSolution.Infrastructure.Repositories
                     switch (sort.ToLower())
                     {
                         case "date":
-                            query = order?.ToLower() == "desc" 
-                                ? query.OrderByDescending(n => n.CreationDate) 
+                            query = order?.ToLower() == "desc"
+                                ? query.OrderByDescending(n => n.CreationDate)
                                 : query.OrderBy(n => n.CreationDate);
                             break;
                         case "name":
-                            query = order?.ToLower() == "desc" 
-                                ? query.OrderByDescending(n => n.Name) 
+                            query = order?.ToLower() == "desc"
+                                ? query.OrderByDescending(n => n.Name)
                                 : query.OrderBy(n => n.Name);
                             break;
                     }
@@ -82,11 +82,11 @@ namespace NotesSolution.Infrastructure.Repositories
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 _logger.LogDebug("Getting note {Id} for user {UserId}", id, userId);
-                
+
                 var result = await _db.Notes.Include(n => n.Tags).FirstOrDefaultAsync(n => n.Id == id && n.UserId == userId, cancellationToken);
-                
+
                 if (result != null)
                 {
                     _logger.LogDebug("Found note {Id} for user {UserId}", id, userId);
@@ -95,7 +95,7 @@ namespace NotesSolution.Infrastructure.Repositories
                 {
                     _logger.LogDebug("Note {Id} not found for user {UserId}", id, userId);
                 }
-                
+
                 return result;
             }
             catch (OperationCanceledException)
@@ -115,7 +115,7 @@ namespace NotesSolution.Infrastructure.Repositories
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 _logger.LogDebug("Creating note {Id} for user {UserId}", note.Id, note.UserId);
 
                 for (int i = 0; i < note.Tags.Count; i++)
@@ -134,10 +134,10 @@ namespace NotesSolution.Infrastructure.Repositories
                         }
                     }
                 }
-                
+
                 await _db.Notes.AddAsync(note, cancellationToken);
                 await SaveAsync(cancellationToken);
-                
+
                 _logger.LogDebug("Successfully created note {Id} for user {UserId}", note.Id, note.UserId);
             }
             catch (OperationCanceledException)
@@ -157,7 +157,7 @@ namespace NotesSolution.Infrastructure.Repositories
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 _logger.LogDebug("Updating note {Id} for user {UserId}", note.Id, note.UserId);
 
                 for (int i = 0; i < note.Tags.Count; i++)
@@ -176,10 +176,10 @@ namespace NotesSolution.Infrastructure.Repositories
                         }
                     }
                 }
-                
+
                 _db.Notes.Update(note);
                 await SaveAsync(cancellationToken);
-                
+
                 _logger.LogDebug("Successfully updated note {Id} for user {UserId}", note.Id, note.UserId);
             }
             catch (OperationCanceledException)
@@ -199,9 +199,9 @@ namespace NotesSolution.Infrastructure.Repositories
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 _logger.LogDebug("Removing note {Id} for user {UserId}", note.Id, note.UserId);
-                
+
                 var tracked = await _db.Notes.FindAsync(new object[] { note.Id }, cancellationToken);
                 if (tracked != null)
                 {
@@ -264,4 +264,4 @@ namespace NotesSolution.Infrastructure.Repositories
             }
         }
     }
-} 
+}

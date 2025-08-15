@@ -1,7 +1,7 @@
+using System.Threading;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using NotesSolution.Application.Interfaces;
-using System.Threading;
 
 namespace NotesSolution.Application.Services
 {
@@ -59,4 +59,4 @@ namespace NotesSolution.Application.Services
             return CancellationTokenSource.CreateLinkedTokenSource(tokens);
         }
     }
-} 
+}
