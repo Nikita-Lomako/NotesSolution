@@ -105,7 +105,7 @@ namespace NotesSolution.Tests.Services
         }
 
         [Fact]
-        public void CreateTimeoutTokenSource_TokenExpiresAfterTimeout()
+        public async Task CreateTimeoutTokenSource_TokenExpiresAfterTimeout()
         {
             // Arrange
             var timeoutMs = 100; // 100ms timeout
@@ -114,7 +114,7 @@ namespace NotesSolution.Tests.Services
             using var tokenSource = _provider.CreateTimeoutTokenSource(timeoutMs);
             
             // Wait for timeout
-            Thread.Sleep(200);
+            await Task.Delay(200);
 
             // Assert
             Assert.True(tokenSource.Token.IsCancellationRequested);

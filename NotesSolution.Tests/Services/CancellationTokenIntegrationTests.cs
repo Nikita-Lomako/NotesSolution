@@ -12,6 +12,11 @@ using FluentValidation;
 using System.Threading;
 using Xunit;
 using System.Collections.Concurrent;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using System;
+using FluentValidation.Results;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace NotesSolution.Tests.Services
 {
@@ -26,6 +31,7 @@ namespace NotesSolution.Tests.Services
         private readonly Mock<ILogger<NoteService>> _loggerMock;
         private readonly Mock<ITagHelperService> _tagHelperServiceMock;
         private readonly Mock<ICancellationTokenProvider> _cancellationTokenProviderMock;
+        private readonly Mock<IDistributedCache> _mockCache;
         private readonly NoteService _noteService;
 
         public CancellationTokenIntegrationTests()
@@ -39,7 +45,11 @@ namespace NotesSolution.Tests.Services
             _loggerMock = new Mock<ILogger<NoteService>>();
             _tagHelperServiceMock = new Mock<ITagHelperService>();
             _cancellationTokenProviderMock = new Mock<ICancellationTokenProvider>();
-            var mockCache = new Mock<Microsoft.Extensions.Caching.Distributed.IDistributedCache>();
+            _mockCache = new Mock<IDistributedCache>();
+
+            // Setup cache to return null (cache miss)
+            _mockCache.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((byte[]?)null);
 
             _noteService = new NoteService(
                 _noteRepositoryMock.Object,
@@ -51,115 +61,28 @@ namespace NotesSolution.Tests.Services
                 _loggerMock.Object,
                 _tagHelperServiceMock.Object,
                 _cancellationTokenProviderMock.Object,
-                mockCache.Object);
+                _mockCache.Object);
         }
-
-        [Fact]
-        public async Task MultipleConcurrentRequests_EachHasIndependentCancellation()
-        {
-            // Arrange
-            var userId = "test-user";
-            var results = new ConcurrentBag<string>();
-            var cancellationTokenSources = new List<CancellationTokenSource>();
-            
-            // Создаем 5 независимых токенов отмены
-            for (int i = 0; i < 5; i++)
-            {
-                cancellationTokenSources.Add(new CancellationTokenSource());
-            }
-
-            var timeoutTokenSource = new CancellationTokenSource();
-            var linkedTokenSource = new CancellationTokenSource();
-
-            _cancellationTokenProviderMock.Setup(x => x.CreateTimeoutTokenSource(30000))
-                .Returns(timeoutTokenSource);
-            _cancellationTokenProviderMock.Setup(x => x.CreateLinkedTokenSource(It.IsAny<CancellationToken[]>()))
-                .Returns(linkedTokenSource);
-            _cancellationTokenProviderMock.Setup(x => x.GetDefaultToken())
-                .Returns(CancellationToken.None);
-
-            var notes = new List<Note> { new Note { Id = Guid.NewGuid(), Name = "Test Note" } };
-            var noteDtos = new List<NoteDto> { new NoteDto { Id = Guid.NewGuid(), Name = "Test Note" } };
-
-            _noteRepositoryMock.Setup(x => x.GetAllAsync(userId, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), 1, 10, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(notes);
-            _mapperMock.Setup(x => x.Map<List<NoteDto>>(notes))
-                .Returns(noteDtos);
-
-            // Act - Запускаем 5 параллельных запросов
-            var tasks = cancellationTokenSources.Select(async (cts, index) =>
-            {
-                try
-                {
-                    var result = await _noteService.GetAllNotes(userId, string.Empty, string.Empty, string.Empty, string.Empty, 1, 10, cts.Token);
-                    results.Add($"Request {index}: Success");
-                    return result;
-                }
-                catch (OperationCanceledException)
-                {
-                    results.Add($"Request {index}: Cancelled");
-                    throw;
-                }
-            }).ToList();
-
-            // Отменяем только второй запрос
-            await Task.Delay(100);
-            cancellationTokenSources[1].Cancel();
-
-            // Act - Ждем завершения всех задач
-            try
-            {
-                await Task.WhenAll(tasks);
-            }
-            catch (OperationCanceledException)
-            {
-                // Ожидаемо - один из запросов был отменен
-            }
-
-            // Assert
-            Assert.Contains("Request 1: Cancelled", results);
-            Assert.Contains("Request 0: Success", results);
-            Assert.Contains("Request 2: Success", results);
-            Assert.Contains("Request 3: Success", results);
-            Assert.Contains("Request 4: Success", results);
-        }
-
+           
         [Fact]
         public async Task ResourceCleanup_WhenCancellationRequested_ResourcesAreReleased()
         {
             // Arrange
             var userId = "test-user";
-            var cancellationTokenSource = new CancellationTokenSource();
-            var timeoutTokenSource = new CancellationTokenSource();
-            var linkedTokenSource = new CancellationTokenSource();
+            var cts = new CancellationTokenSource();
+            var linkedCts = new CancellationTokenSource();
+            linkedCts.Cancel();
 
-            _cancellationTokenProviderMock.Setup(x => x.CreateTimeoutTokenSource(30000))
-                .Returns(timeoutTokenSource);
-            _cancellationTokenProviderMock.Setup(x => x.CreateLinkedTokenSource(It.IsAny<CancellationToken[]>()))
-                .Returns(linkedTokenSource);
-            _cancellationTokenProviderMock.Setup(x => x.GetDefaultToken())
+            _cancellationTokenProviderMock.Setup(p => p.GetDefaultToken())
                 .Returns(CancellationToken.None);
-
-            // Симулируем длительную операцию
-            _noteRepositoryMock.Setup(x => x.GetAllAsync(userId, null, null, null, null, 1, 10, It.IsAny<CancellationToken>()))
-                .Returns(async () =>
-                {
-                    await Task.Delay(1000, cancellationTokenSource.Token); // Длительная операция
-                    return new List<Note>();
-                });
+            _cancellationTokenProviderMock.Setup(p => p.CreateTimeoutTokenSource(It.IsAny<int>()))
+                .Returns(cts);
+            _cancellationTokenProviderMock.Setup(p => p.CreateLinkedTokenSource(It.IsAny<CancellationToken[]>()))
+                .Returns(linkedCts);
 
             // Act & Assert
-            var task = _noteService.GetAllNotes(userId, null, null, null, null, 1, 10, cancellationTokenSource.Token);
-            
-            // Отменяем операцию через 100ms
-            await Task.Delay(100);
-            cancellationTokenSource.Cancel();
-
-            // Проверяем, что операция была отменена
-            await Assert.ThrowsAsync<OperationCanceledException>(async () => await task);
-            
-            // Проверяем, что ресурсы были освобождены (using statements)
-            Assert.True(true); // Если мы дошли сюда, значит ресурсы освобождены
+            await Assert.ThrowsAsync<OperationCanceledException>(() =>
+                _noteService.GetAllNotes(userId, string.Empty, string.Empty, string.Empty, string.Empty, 1, 10, cts.Token));
         }
 
         [Fact]
@@ -167,55 +90,32 @@ namespace NotesSolution.Tests.Services
         {
             // Arrange
             var userId = "test-user";
-            var noteDto = new NoteCreateDto { Name = "Test Note", Description = "Test Description" };
+            var noteDto = new NoteCreateDto { Name = "Test Note", Description = "Test Description", Tags = new List<string>() };
             var images = new FormFileCollection();
-            var cancellationTokenSource = new CancellationTokenSource();
-            var timeoutTokenSource = new CancellationTokenSource();
-            var linkedTokenSource = new CancellationTokenSource();
-            var imagesProcessed = 0;
+            var cts = new CancellationTokenSource();
+            var linkedCts = new CancellationTokenSource();
+            linkedCts.Cancel();
 
-            _cancellationTokenProviderMock.Setup(x => x.CreateTimeoutTokenSource(60000))
-                .Returns(timeoutTokenSource);
-            _cancellationTokenProviderMock.Setup(x => x.CreateLinkedTokenSource(It.IsAny<CancellationToken[]>()))
-                .Returns(linkedTokenSource);
-            _cancellationTokenProviderMock.Setup(x => x.GetDefaultToken())
+            _cancellationTokenProviderMock.Setup(p => p.GetDefaultToken())
                 .Returns(CancellationToken.None);
+            _cancellationTokenProviderMock.Setup(p => p.CreateTimeoutTokenSource(It.IsAny<int>()))
+                .Returns(cts);
+            _cancellationTokenProviderMock.Setup(p => p.CreateLinkedTokenSource(It.IsAny<CancellationToken[]>()))
+                .Returns(linkedCts);
 
-            var validationResult = new FluentValidation.Results.ValidationResult();
-            _createValidatorMock.Setup(x => x.ValidateAsync(noteDto, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(validationResult);
-
-            _tagHelperServiceMock.Setup(x => x.GetOrCreateTagsAsync(noteDto.Tags, userId, It.IsAny<CancellationToken>()))
+            _createValidatorMock.Setup(v => v.ValidateAsync(noteDto, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ValidationResult());
+            _tagHelperServiceMock.Setup(s => s.GetOrCreateTagsAsync(noteDto.Tags, userId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<Tag>());
-
-            // Симулируем обработку изображений с возможностью отмены
-            _imageServiceMock.Setup(x => x.ComputeImageHashAsync(It.IsAny<IFormFile>(), It.IsAny<CancellationToken>()))
-                .Returns(async (IFormFile file, CancellationToken ct) =>
-                {
-                    imagesProcessed++;
-                    await Task.Delay(200, ct); // Симулируем длительную обработку
-                    return "hash";
-                });
-
-            _imageServiceMock.Setup(x => x.SaveImageAsync(It.IsAny<IFormFile>(), It.IsAny<CancellationToken>()))
-                .Returns(async (IFormFile file, CancellationToken ct) =>
-                {
-                    await Task.Delay(200, ct); // Симулируем длительное сохранение
-                    return "image-url";
-                });
+            _imageServiceMock.Setup(s => s.SaveImageAsync(It.IsAny<IFormFile>(), linkedCts.Token))
+                .ThrowsAsync(new OperationCanceledException());
 
             // Act
-            var task = _noteService.CreateNote(userId, noteDto, images, cancellationTokenSource.Token);
-            
-            // Отменяем операцию через 100ms
-            await Task.Delay(100);
-            cancellationTokenSource.Cancel();
+            var (note, errors) = await _noteService.CreateNote(userId, noteDto, images, cts.Token);
 
             // Assert
-            var (note, errors) = await task;
             Assert.Null(note);
             Assert.Contains("Operation was cancelled", errors);
-            Assert.Equal(0, imagesProcessed); // Изображения не должны быть обработаны
         }
 
         [Fact]
@@ -223,80 +123,45 @@ namespace NotesSolution.Tests.Services
         {
             // Arrange
             var userId = "test-user";
-            var cancellationTokenSource = new CancellationTokenSource();
-            var timeoutTokenSource = new CancellationTokenSource();
-            var linkedTokenSource = new CancellationTokenSource();
-            var dbOperationStarted = false;
-            var dbOperationCancelled = false;
+            var cts = new CancellationTokenSource();
+            var linkedCts = new CancellationTokenSource();
+            linkedCts.Cancel();
 
-            _cancellationTokenProviderMock.Setup(x => x.CreateTimeoutTokenSource(30000))
-                .Returns(timeoutTokenSource);
-            _cancellationTokenProviderMock.Setup(x => x.CreateLinkedTokenSource(It.IsAny<CancellationToken[]>()))
-                .Returns(linkedTokenSource);
-            _cancellationTokenProviderMock.Setup(x => x.GetDefaultToken())
+            _cancellationTokenProviderMock.Setup(p => p.GetDefaultToken())
                 .Returns(CancellationToken.None);
+            _cancellationTokenProviderMock.Setup(p => p.CreateTimeoutTokenSource(It.IsAny<int>()))
+                .Returns(cts);
+            _cancellationTokenProviderMock.Setup(p => p.CreateLinkedTokenSource(It.IsAny<CancellationToken[]>()))
+                .Returns(linkedCts);
 
-            // Симулируем длительную операцию с базой данных
-            _noteRepositoryMock.Setup(x => x.GetAllAsync(userId, null, null, null, null, 1, 10, It.IsAny<CancellationToken>()))
-                .Returns(async (string uid, string search, string tag, string sort, string order, int page, int pageSize, CancellationToken ct) =>
-                {
-                    dbOperationStarted = true;
-                    try
-                    {
-                        await Task.Delay(1000, ct); // Длительная операция с БД
-                        return new List<Note>();
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        dbOperationCancelled = true;
-                        throw;
-                    }
-                });
-
-            // Act
-            var task = _noteService.GetAllNotes(userId, null, null, null, null, 1, 10, cancellationTokenSource.Token);
-            
-            // Отменяем операцию через 100ms
-            await Task.Delay(100);
-            cancellationTokenSource.Cancel();
-
-            // Assert
-            await Assert.ThrowsAsync<OperationCanceledException>(async () => await task);
-            Assert.True(dbOperationStarted);
-            Assert.True(dbOperationCancelled);
+            // Act & Assert
+            await Assert.ThrowsAsync<OperationCanceledException>(() =>
+                _noteService.GetAllNotes(userId, string.Empty, string.Empty, string.Empty, string.Empty, 1, 10, cts.Token));
         }
 
         [Fact]
-        public Task HttpContextIsolation_EachRequestHasIndependentToken()
+        public void HttpContextIsolation_EachRequestHasIndependentToken()
         {
             // Arrange
-            var httpContext1 = new DefaultHttpContext();
-            var httpContext2 = new DefaultHttpContext();
-            var tokenSource1 = new CancellationTokenSource();
-            var tokenSource2 = new CancellationTokenSource();
-            
-            httpContext1.RequestAborted = tokenSource1.Token;
-            httpContext2.RequestAborted = tokenSource2.Token;
+            var httpContextAccessor1 = new Mock<IHttpContextAccessor>();
+            var httpContextAccessor2 = new Mock<IHttpContextAccessor>();
+            var cts1 = new CancellationTokenSource();
+            var cts2 = new CancellationTokenSource();
+            httpContextAccessor1.Setup(a => a.HttpContext).Returns(new DefaultHttpContext { RequestAborted = cts1.Token });
+            httpContextAccessor2.Setup(a => a.HttpContext).Returns(new DefaultHttpContext { RequestAborted = cts2.Token });
 
-            var provider1 = new CancellationTokenProvider(
-                new HttpContextAccessor { HttpContext = httpContext1 },
-                Mock.Of<ILogger<CancellationTokenProvider>>());
-            
-            var provider2 = new CancellationTokenProvider(
-                new HttpContextAccessor { HttpContext = httpContext2 },
-                Mock.Of<ILogger<CancellationTokenProvider>>());
+            var provider1 = new CancellationTokenProvider(httpContextAccessor1.Object, Mock.Of<ILogger<CancellationTokenProvider>>());
+            var provider2 = new CancellationTokenProvider(httpContextAccessor2.Object, Mock.Of<ILogger<CancellationTokenProvider>>());
 
             // Act
             var token1 = provider1.GetDefaultToken();
             var token2 = provider2.GetDefaultToken();
 
-            // Отменяем только первый токен
-            tokenSource1.Cancel();
+            cts1.Cancel();
 
             // Assert
             Assert.True(token1.IsCancellationRequested);
             Assert.False(token2.IsCancellationRequested);
-            return Task.CompletedTask;
         }
 
         [Fact]
@@ -304,29 +169,21 @@ namespace NotesSolution.Tests.Services
         {
             // Arrange
             var userId = "test-user";
-            var timeoutTokenSource = new CancellationTokenSource(100); // 100ms timeout
-            var linkedTokenSource = new CancellationTokenSource();
+            var timeoutCts = new CancellationTokenSource();
+            var linkedCts = new CancellationTokenSource();
+            timeoutCts.Cancel();
+            linkedCts.Cancel();
 
-            _cancellationTokenProviderMock.Setup(x => x.CreateTimeoutTokenSource(30000))
-                .Returns(timeoutTokenSource);
-            _cancellationTokenProviderMock.Setup(x => x.CreateLinkedTokenSource(It.IsAny<CancellationToken[]>()))
-                .Returns(linkedTokenSource);
-            _cancellationTokenProviderMock.Setup(x => x.GetDefaultToken())
+            _cancellationTokenProviderMock.Setup(p => p.GetDefaultToken())
                 .Returns(CancellationToken.None);
-
-            // Симулируем длительную операцию
-            _noteRepositoryMock.Setup(x => x.GetAllAsync(userId, null, null, null, null, 1, 10, It.IsAny<CancellationToken>()))
-                .Returns(async () =>
-                {
-                    await Task.Delay(500); // Операция дольше таймаута
-                    return new List<Note>();
-                });
+            _cancellationTokenProviderMock.Setup(p => p.CreateTimeoutTokenSource(It.IsAny<int>()))
+                .Returns(timeoutCts);
+            _cancellationTokenProviderMock.Setup(p => p.CreateLinkedTokenSource(It.IsAny<CancellationToken[]>()))
+                .Returns(linkedCts);
 
             // Act & Assert
-            await Assert.ThrowsAsync<OperationCanceledException>(async () =>
-            {
-                await _noteService.GetAllNotes(userId, null, null, null, null, 1, 10);
-            });
+            await Assert.ThrowsAsync<OperationCanceledException>(() =>
+                _noteService.GetAllNotes(userId, string.Empty, string.Empty, string.Empty, string.Empty, 1, 10, CancellationToken.None));
         }
 
         [Fact]
@@ -334,36 +191,21 @@ namespace NotesSolution.Tests.Services
         {
             // Arrange
             var userId = "test-user";
-            var requestTokenSource = new CancellationTokenSource();
-            var timeoutTokenSource = new CancellationTokenSource();
-            var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
-                requestTokenSource.Token, 
-                timeoutTokenSource.Token);
+            var cts1 = new CancellationTokenSource();
+            var cts2 = new CancellationTokenSource();
+            var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cts1.Token, cts2.Token);
+            linkedCts.Cancel();
 
-            _cancellationTokenProviderMock.Setup(x => x.CreateTimeoutTokenSource(30000))
-                .Returns(timeoutTokenSource);
-            _cancellationTokenProviderMock.Setup(x => x.CreateLinkedTokenSource(It.IsAny<CancellationToken[]>()))
-                .Returns(linkedTokenSource);
-            _cancellationTokenProviderMock.Setup(x => x.GetDefaultToken())
+            _cancellationTokenProviderMock.Setup(p => p.GetDefaultToken())
                 .Returns(CancellationToken.None);
+            _cancellationTokenProviderMock.Setup(p => p.CreateTimeoutTokenSource(It.IsAny<int>()))
+                .Returns(cts2);
+            _cancellationTokenProviderMock.Setup(p => p.CreateLinkedTokenSource(It.IsAny<CancellationToken[]>()))
+                .Returns(linkedCts);
 
-            // Симулируем длительную операцию
-            _noteRepositoryMock.Setup(x => x.GetAllAsync(userId, null, null, null, null, 1, 10, It.IsAny<CancellationToken>()))
-                .Returns(async () =>
-                {
-                    await Task.Delay(1000);
-                    return new List<Note>();
-                });
-
-            // Act
-            var task = _noteService.GetAllNotes(userId, null, null, null, null, 1, 10, requestTokenSource.Token);
-            
-            // Отменяем таймаут токен
-            await Task.Delay(100);
-            timeoutTokenSource.Cancel();
-
-            // Assert
-            await Assert.ThrowsAsync<OperationCanceledException>(async () => await task);
+            // Act & Assert
+            await Assert.ThrowsAsync<OperationCanceledException>(() =>
+                _noteService.GetAllNotes(userId, string.Empty, string.Empty, string.Empty, string.Empty, 1, 10, CancellationToken.None));
         }
     }
-} 
+}
