@@ -271,4 +271,4 @@ namespace NotesSolution.Tests.Validation
             result.ShouldNotHaveValidationErrorFor(x => x.Name);
         }
     }
-} 
+}

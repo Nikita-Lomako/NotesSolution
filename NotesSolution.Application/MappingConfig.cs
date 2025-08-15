@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -17,10 +17,10 @@ namespace NotesSolution.Application
             // Note mappings
             CreateMap<Note, NoteDto>()
                 .ForMember(dest => dest.Tags, opt => opt.MapFrom(src => src.Tags.Select(t => t.Name).ToList()));
-            
+
             CreateMap<NoteCreateDto, Note>()
                 .ForMember(dest => dest.Tags, opt => opt.Ignore());
-                
+
             CreateMap<NoteUpdateDto, Note>()
                 .ForMember(dest => dest.Tags, opt => opt.Ignore());
 

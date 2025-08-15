@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Microsoft.AspNetCore.Identity;
 using NotesSolution.Application;
 using NotesSolution.Application.Dtos;
@@ -48,7 +48,7 @@ namespace NotesSolution.Tests.Utils
             Assert.Equal(note.Tags.Count, noteDto.Tags.Count);
             Assert.Equal(note.ImageUrls.Count, noteDto.ImageUrls.Count);
         }
-        
+
 
         [Fact]
         public void TagToTagDto_ShouldMapCorrectly()
@@ -86,7 +86,7 @@ namespace NotesSolution.Tests.Utils
             Assert.Equal(tagDto.Id, tag.Id);
             Assert.Equal(tagDto.Name, tag.Name);
         }
-        
+
         [Fact]
         public void IdentityUser_To_UserDto_Mapping_Should_Work_Correctly()
         {
@@ -111,6 +111,6 @@ namespace NotesSolution.Tests.Utils
             // Assert
             Assert.Equal(identityUser.Id, userDto.Id);
             Assert.Equal(identityUser.UserName, userDto.Name);
-        }      
+        }
     }
 }

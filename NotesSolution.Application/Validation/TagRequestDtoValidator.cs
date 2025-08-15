@@ -10,4 +10,4 @@ namespace NotesSolution.Application.Validation
             RuleFor(x => x.Name).NotEmpty().MaximumLength(50);
         }
     }
-} 
+}

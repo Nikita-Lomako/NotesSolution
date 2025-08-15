@@ -1,3 +1,4 @@
+using System.Threading;
 using NotesSolution.Core.Models;
 using System.Threading;
 
@@ -13,4 +14,4 @@ namespace NotesSolution.Core.Interfaces.IRepositories
         Task SaveAsync(CancellationToken cancellationToken = default);
         Task<bool> ExistsAsync(string userId, Guid id, CancellationToken cancellationToken = default);
     }
-} 
+}

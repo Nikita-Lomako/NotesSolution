@@ -1,7 +1,7 @@
+using System.Threading;
 using Microsoft.AspNetCore.Mvc;
 using NotesSolution.Application.Dtos;
 using NotesSolution.Application.Interfaces;
-using System.Threading;
 
 namespace NotesSolution.API.Endpoints
 {
@@ -70,4 +70,4 @@ namespace NotesSolution.API.Endpoints
             }
         }
     }
-} 
+}

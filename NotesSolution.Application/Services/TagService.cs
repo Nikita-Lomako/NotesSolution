@@ -1,17 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using NotesSolution.Application.Dtos;
-using NotesSolution.Core.Interfaces.IRepositories;
-using NotesSolution.Core.Models;
 using AutoMapper;
 using FluentValidation;
-using Microsoft.Extensions.Logging;
-using NotesSolution.Application.Interfaces;
 using Microsoft.Extensions.Caching.Distributed;
-using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using NotesSolution.Application.Dtos;
+using NotesSolution.Application.Interfaces;
+using NotesSolution.Core.Interfaces.IRepositories;
+using NotesSolution.Core.Models;
 
 namespace NotesSolution.Application.Services
 {
@@ -278,39 +278,39 @@ namespace NotesSolution.Application.Services
             {
                 using var timeoutTokenSource = _cancellationTokenProvider.CreateTimeoutTokenSource(15000); // 15 seconds timeout
                 using var linkedTokenSource = _cancellationTokenProvider.CreateLinkedTokenSource(
-                    cancellationToken, 
-                    timeoutTokenSource.Token, 
+                    cancellationToken,
+                    timeoutTokenSource.Token,
                     _cancellationTokenProvider.GetDefaultToken());
 
                 var combinedToken = linkedTokenSource.Token;
 
                 _logger.LogInformation("Attempting to create new tag for user {UserId} with name={Name}", userId, tagDto.Name);
-                
+
                 // Check cancellation before validation
                 combinedToken.ThrowIfCancellationRequested();
-                
+
                 var validationResult = await _validator.ValidateAsync(tagDto, combinedToken);
                 if (!validationResult.IsValid)
                 {
                     _logger.LogWarning("Validation failed for new tag: {Errors}", string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
                     return (null, validationResult.Errors.Select(e => e.ErrorMessage).ToList(), false);
                 }
-                
+
                 // Check cancellation before checking existing tag
                 combinedToken.ThrowIfCancellationRequested();
-                
+
                 var existingTag = await _tagRepository.GetByNameAsync(userId, tagDto.Name, combinedToken);
                 if (existingTag != null && existingTag.UserId == userId)
                 {
                     _logger.LogWarning("Tag with name {Name} already exists for user {UserId}", tagDto.Name, userId);
                     return (null, new List<string>(), true);
                 }
-                
+
                 var tag = new Tag { Name = tagDto.Name, UserId = userId };
-                
+
                 // Check cancellation before creating tag
                 combinedToken.ThrowIfCancellationRequested();
-                
+
                 await _tagRepository.CreateAsync(tag, combinedToken);
                 _logger.LogInformation("Created new tag with id {Id} for user {UserId}", tag.Id, userId);
                 return (_mapper.Map<TagDto>(tag), new List<string>(), false);
@@ -333,49 +333,49 @@ namespace NotesSolution.Application.Services
             {
                 using var timeoutTokenSource = _cancellationTokenProvider.CreateTimeoutTokenSource(15000); // 15 seconds timeout
                 using var linkedTokenSource = _cancellationTokenProvider.CreateLinkedTokenSource(
-                    cancellationToken, 
-                    timeoutTokenSource.Token, 
+                    cancellationToken,
+                    timeoutTokenSource.Token,
                     _cancellationTokenProvider.GetDefaultToken());
 
                 var combinedToken = linkedTokenSource.Token;
 
                 _logger.LogInformation("Updating tag with id {Id} for user {UserId}", id, userId);
-                
+
                 // Check cancellation before validation
                 combinedToken.ThrowIfCancellationRequested();
-                
+
                 var validationResult = await _validator.ValidateAsync(tagDto, combinedToken);
                 if (!validationResult.IsValid)
                 {
                     _logger.LogWarning("Validation failed for updating tag {Id}: {Errors}", id, string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
                     return (null, validationResult.Errors.Select(e => e.ErrorMessage).ToList(), false, false);
                 }
-                
+
                 // Check cancellation before getting existing tag
                 combinedToken.ThrowIfCancellationRequested();
-                
+
                 var existingTag = await GetUserTagByIdAsync(userId, id, combinedToken);
                 if (existingTag == null)
                 {
                     _logger.LogWarning("Tag with id {Id} not found or not owned by user {UserId}", id, userId);
                     return (null, new List<string>(), true, false);
                 }
-                
+
                 // Check cancellation before checking for name conflict
                 combinedToken.ThrowIfCancellationRequested();
-                
+
                 var tagWithSameName = await GetUserTagByNameAsync(userId, tagDto.Name, combinedToken);
                 if (tagWithSameName != null && tagWithSameName.Id != id)
                 {
                     _logger.LogWarning("Tag with name {Name} already exists for user {UserId}", tagDto.Name, userId);
                     return (null, new List<string>(), false, true);
                 }
-                
+
                 existingTag.Name = tagDto.Name;
-                
+
                 // Check cancellation before updating tag
                 combinedToken.ThrowIfCancellationRequested();
-                
+
                 await _tagRepository.UpdateAsync(existingTag, combinedToken);
 
                 var cacheKey = $"tag_{userId}_{id}";
@@ -410,32 +410,32 @@ namespace NotesSolution.Application.Services
             {
                 using var timeoutTokenSource = _cancellationTokenProvider.CreateTimeoutTokenSource(30000); // 30 seconds timeout for complex operation
                 using var linkedTokenSource = _cancellationTokenProvider.CreateLinkedTokenSource(
-                    cancellationToken, 
-                    timeoutTokenSource.Token, 
+                    cancellationToken,
+                    timeoutTokenSource.Token,
                     _cancellationTokenProvider.GetDefaultToken());
 
                 var combinedToken = linkedTokenSource.Token;
 
                 _logger.LogInformation("Deleting tag with id {Id} for user {UserId}", id, userId);
-                
+
                 // Check cancellation before getting tag
                 combinedToken.ThrowIfCancellationRequested();
-                
+
                 var tag = await GetUserTagByIdAsync(userId, id, combinedToken);
                 if (tag == null)
                 {
                     _logger.LogWarning("Tag with id {Id} not found or not owned by user {UserId}", id, userId);
                     return false;
                 }
-                
+
                 // Check cancellation before removing tag from notes
                 combinedToken.ThrowIfCancellationRequested();
-                
+
                 await RemoveTagFromAllUserNotesAsync(userId, id, combinedToken);
-                
+
                 // Check cancellation before deleting tag
                 combinedToken.ThrowIfCancellationRequested();
-                
+
                 await _tagRepository.RemoveAsync(tag, combinedToken);
 
                 var cacheKey = $"tag_{userId}_{id}";
@@ -483,7 +483,7 @@ namespace NotesSolution.Application.Services
                 {
                     // Check cancellation before each note update
                     cancellationToken.ThrowIfCancellationRequested();
-                    
+
                     note.Tags.RemoveAll(t => t.Id == tagId);
                     await _noteRepository.UpdateAsync(note, cancellationToken);
                 }
@@ -500,4 +500,4 @@ namespace NotesSolution.Application.Services
             }
         }
     }
-} 
+}

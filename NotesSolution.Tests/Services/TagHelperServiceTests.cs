@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -6,7 +7,6 @@ using NotesSolution.Application.Services;
 using NotesSolution.Core.Interfaces.IRepositories;
 using NotesSolution.Core.Models;
 using Xunit;
-using System;
 
 namespace NotesSolution.Tests.Services
 {
@@ -65,4 +65,4 @@ namespace NotesSolution.Tests.Services
             _mockTagRepository.Verify(r => r.CreateAsync(It.Is<Tag>(t => t.Name == "tag2" && t.UserId == userId), It.IsAny<CancellationToken>()), Times.Once);
         }
     }
-} 
+}

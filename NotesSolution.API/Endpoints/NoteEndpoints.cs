@@ -1,18 +1,18 @@
+using System.Net;
+using System.Security.Claims;
+using System.Threading;
 using AutoMapper;
 using FluentValidation;
-using Microsoft.AspNetCore.Mvc;
-using NotesSolution.Core.Interfaces.IRepositories;
-using NotesSolution.Core.Models;
-using System.Net;
-using Microsoft.Extensions.Logging;
-using Microsoft.AspNetCore.Http;
-using NotesSolution.Core.Interfaces;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using NotesSolution.Application.Dtos;
 using NotesSolution.Application.Services;
-using System.Threading;
+using NotesSolution.Core.Interfaces;
+using NotesSolution.Core.Interfaces.IRepositories;
+using NotesSolution.Core.Models;
 
 namespace NotesSolution.API.Endpoints
 {

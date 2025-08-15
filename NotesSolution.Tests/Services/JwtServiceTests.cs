@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Claims;
 using Microsoft.Extensions.Configuration;
 using NotesSolution.Application.Services;
 using Xunit;
-using System.Linq;
 
 namespace NotesSolution.Tests.Services
 {
@@ -36,4 +36,4 @@ namespace NotesSolution.Tests.Services
             Assert.Empty(userClaims);
         }
     }
-} 
+}
