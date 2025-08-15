@@ -1,6 +1,5 @@
 using System.Threading;
 using NotesSolution.Core.Models;
-using System.Threading;
 
 namespace NotesSolution.Core.Interfaces.IRepositories
 {
