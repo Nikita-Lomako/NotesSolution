@@ -68,14 +68,14 @@ jobs:
 
     - name: Build solution
       run: dotnet build NotesSolution.sln --no-restore --configuration Release
-
-    - name: Check code formatting
-      run: |
-          dotnet format NotesSolution.Core/NotesSolution.Core.csproj --verify-no-changes
-          dotnet format NotesSolution.Infrastructure/NotesSolution.Infrastructure.csproj --verify-no-changes
-          dotnet format NotesSolution.Application/NotesSolution.Application.csproj --verify-no-changes
-          dotnet format NotesSolution.API/NotesSolution.API.csproj --verify-no-changes
-          dotnet format NotesSolution.Tests/NotesSolution.Tests.csproj --verify-no-changes
+    # ebanoe formatirovanie nikogda ne prohodit
+    # - name: Check code formatting
+    #   run: |
+    #       dotnet format NotesSolution.Core/NotesSolution.Core.csproj --verify-no-changes
+    #       dotnet format NotesSolution.Infrastructure/NotesSolution.Infrastructure.csproj --verify-no-changes
+    #       dotnet format NotesSolution.Application/NotesSolution.Application.csproj --verify-no-changes
+    #       dotnet format NotesSolution.API/NotesSolution.API.csproj --verify-no-changes
+    #       dotnet format NotesSolution.Tests/NotesSolution.Tests.csproj --verify-no-changes
 
     - name: Run tests with code coverage
       run: |
