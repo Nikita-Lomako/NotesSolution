@@ -1,10 +1,10 @@
-using NotesSolution.Core.Interfaces;
-using NotesSolution.Core.Interfaces.IRepositories;
-using NotesSolution.Core.Models;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using NotesSolution.Core.Interfaces;
+using NotesSolution.Core.Interfaces.IRepositories;
+using NotesSolution.Core.Models;
 
 namespace NotesSolution.Application.Services
 {
@@ -24,12 +24,12 @@ namespace NotesSolution.Application.Services
             try
             {
                 var tagEntities = new List<Tag>();
-                
+
                 foreach (var tagName in tagNames)
                 {
                     // Check cancellation before each tag operation
                     cancellationToken.ThrowIfCancellationRequested();
-                    
+
                     var existingTag = await _tagRepository.GetByNameAsync(userId, tagName, cancellationToken);
                     if (existingTag != null && existingTag.UserId == userId)
                     {
@@ -44,7 +44,7 @@ namespace NotesSolution.Application.Services
                         _logger.LogDebug("Created new tag {TagName} for user {UserId}", tagName, userId);
                     }
                 }
-                
+
                 _logger.LogInformation("Processed {TagCount} tags for user {UserId}", tagEntities.Count, userId);
                 return tagEntities;
             }
@@ -60,4 +60,4 @@ namespace NotesSolution.Application.Services
             }
         }
     }
-} 
+}

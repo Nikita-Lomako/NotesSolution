@@ -9,4 +9,4 @@ namespace NotesSolution.Application.Dtos
         public List<string> ImageUrls { get; set; } = new();
         public DateTime CreationDate { get; set; }
     }
-} 
+}

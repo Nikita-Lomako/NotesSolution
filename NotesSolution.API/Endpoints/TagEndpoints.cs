@@ -1,14 +1,14 @@
+using System.Security.Claims;
+using System.Threading;
 using AutoMapper;
 using FluentValidation;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using NotesSolution.Application.Dtos;
+using NotesSolution.Application.Interfaces;
+using NotesSolution.Core.Interfaces;
 using NotesSolution.Core.Interfaces.IRepositories;
 using NotesSolution.Core.Models;
-using Microsoft.AspNetCore.Http;
-using System.Security.Claims;
-using NotesSolution.Application.Dtos;
-using NotesSolution.Core.Interfaces;
-using NotesSolution.Application.Interfaces;
-using System.Threading;
 
 namespace NotesSolution.API.Endpoints
 {
@@ -193,4 +193,4 @@ namespace NotesSolution.API.Endpoints
             }
         }
     }
-} 
+}

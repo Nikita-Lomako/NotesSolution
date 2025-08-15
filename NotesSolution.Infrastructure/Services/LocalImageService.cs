@@ -1,12 +1,12 @@
-﻿using Microsoft.AspNetCore.Http;
-using NotesSolution.Core.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using NotesSolution.Core.Interfaces;
 
 namespace NotesSolution.Infrastructure.Services
 {
@@ -35,7 +35,7 @@ namespace NotesSolution.Infrastructure.Services
             {
                 // Check cancellation before starting file operation
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
                 var filePath = Path.Combine(_imagePath, fileName);
 
@@ -46,7 +46,7 @@ namespace NotesSolution.Infrastructure.Services
 
                 var imageUrl = $"/images/{fileName}";
                 _logger.LogDebug("Successfully saved image {FileName} as {ImageUrl}", fileName, imageUrl);
-                
+
                 return imageUrl;
             }
             catch (OperationCanceledException)
@@ -91,14 +91,14 @@ namespace NotesSolution.Infrastructure.Services
             {
                 // Check cancellation before starting hash computation
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 _logger.LogDebug("Computing hash for image {FileName}", file.FileName);
-                
+
                 using var stream = file.OpenReadStream();
                 using var sha256 = System.Security.Cryptography.SHA256.Create();
                 var hash = await sha256.ComputeHashAsync(stream, cancellationToken);
                 var hashString = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-                
+
                 _logger.LogDebug("Computed hash {Hash} for image {FileName}", hashString, file.FileName);
                 return hashString;
             }

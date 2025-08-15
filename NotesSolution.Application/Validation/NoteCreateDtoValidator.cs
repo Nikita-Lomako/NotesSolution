@@ -13,4 +13,4 @@ namespace NotesSolution.Application.Validation
             RuleFor(x => x.ImageUrls).NotNull();
         }
     }
-} 
+}

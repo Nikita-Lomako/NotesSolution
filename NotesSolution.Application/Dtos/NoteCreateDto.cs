@@ -7,4 +7,4 @@ namespace NotesSolution.Application.Dtos
         public List<string> Tags { get; set; } = new();
         public List<string> ImageUrls { get; set; } = new();
     }
-} 
+}

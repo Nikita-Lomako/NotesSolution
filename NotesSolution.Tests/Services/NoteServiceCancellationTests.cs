@@ -1,21 +1,21 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using AutoMapper;
+using FluentValidation;
+using FluentValidation.Results;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using Moq;
 using NotesSolution.Application.Dtos;
-using NotesSolution.Application.Services;
 using NotesSolution.Application.Interfaces;
-using NotesSolution.Core.Interfaces.IRepositories;
+using NotesSolution.Application.Services;
 using NotesSolution.Core.Interfaces;
+using NotesSolution.Core.Interfaces.IRepositories;
 using NotesSolution.Core.Models;
-using AutoMapper;
-using FluentValidation;
-using System.Threading;
 using Xunit;
-using System.Threading.Tasks;
-using System.Collections.Generic;
-using System;
-using FluentValidation.Results;
-using Microsoft.Extensions.Caching.Distributed;
 
 namespace NotesSolution.Tests.Services
 {

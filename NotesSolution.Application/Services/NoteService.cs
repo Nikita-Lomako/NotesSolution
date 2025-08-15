@@ -1,19 +1,19 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using NotesSolution.Application.Dtos;
-using NotesSolution.Core.Interfaces.IRepositories;
-using NotesSolution.Core.Models;
-using NotesSolution.Core.Interfaces;
 using AutoMapper;
 using FluentValidation;
-using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Logging;
+using NotesSolution.Application.Dtos;
 using NotesSolution.Application.Interfaces;
-using System.Text.Json;
+using NotesSolution.Core.Interfaces;
+using NotesSolution.Core.Interfaces.IRepositories;
+using NotesSolution.Core.Models;
 
 namespace NotesSolution.Application.Services
 {
@@ -132,8 +132,8 @@ namespace NotesSolution.Application.Services
             {
                 using var timeoutTokenSource = _cancellationTokenProvider.CreateTimeoutTokenSource(15000); // 15 seconds timeout
                 using var linkedTokenSource = _cancellationTokenProvider.CreateLinkedTokenSource(
-                    cancellationToken, 
-                    timeoutTokenSource.Token, 
+                    cancellationToken,
+                    timeoutTokenSource.Token,
                     _cancellationTokenProvider.GetDefaultToken());
 
                 var combinedToken = linkedTokenSource.Token;
@@ -217,29 +217,29 @@ namespace NotesSolution.Application.Services
         public async Task<(NoteDto? note, List<string> errors)> CreateNote(string userId, NoteCreateDto noteDto, IFormFileCollection? images, CancellationToken cancellationToken = default)
         {
             var errors = new List<string>();
-            
+
             try
             {
                 using var timeoutTokenSource = _cancellationTokenProvider.CreateTimeoutTokenSource(60000); // 60 seconds timeout for image processing
                 using var linkedTokenSource = _cancellationTokenProvider.CreateLinkedTokenSource(
-                    cancellationToken, 
-                    timeoutTokenSource.Token, 
+                    cancellationToken,
+                    timeoutTokenSource.Token,
                     _cancellationTokenProvider.GetDefaultToken());
 
                 var combinedToken = linkedTokenSource.Token;
 
                 _logger.LogInformation("Attempting to create new note for user {UserId} with name={Name}", userId, noteDto.Name);
-                
+
                 // Check cancellation before validation
                 combinedToken.ThrowIfCancellationRequested();
-                
+
                 var validationResult = await _createValidator.ValidateAsync(noteDto, combinedToken);
                 if (!validationResult.IsValid)
                 {
                     _logger.LogWarning("Validation failed for new note: {Errors}", string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
                     return (null, validationResult.Errors.Select(e => e.ErrorMessage).ToList());
                 }
-            var note = _mapper.Map<Note>(noteDto);
+                var note = _mapper.Map<Note>(noteDto);
 
                 note.UserId = userId;
 
@@ -250,14 +250,14 @@ namespace NotesSolution.Application.Services
                 note.Tags = tagEntities;
                 note.CreationDate = DateTime.UtcNow;
                 var imageHashes = new HashSet<string>();
-                
+
                 if (images != null && images.Count > 0)
                 {
                     foreach (var image in images)
                     {
                         // Check cancellation before each image processing
                         combinedToken.ThrowIfCancellationRequested();
-                        
+
                         var hash = await _imageService.ComputeImageHashAsync(image, combinedToken);
                         if (!imageHashes.Contains(hash))
                         {
@@ -271,7 +271,7 @@ namespace NotesSolution.Application.Services
                 // Check cancellation before database operation
                 combinedToken.ThrowIfCancellationRequested();
                 await _noteRepository.CreateAsync(note, combinedToken);
-                
+
                 _logger.LogInformation("Created new note with id {Id} for user {UserId}", note.Id, userId);
                 return (_mapper.Map<NoteDto>(note), new List<string>());
             }
@@ -292,22 +292,22 @@ namespace NotesSolution.Application.Services
         public async Task<(NoteDto? note, List<string> errors, bool notFound)> UpdateNote(string userId, Guid id, NoteUpdateDto noteDto, IFormFileCollection? images, CancellationToken cancellationToken = default)
         {
             var errors = new List<string>();
-            
+
             try
             {
                 using var timeoutTokenSource = _cancellationTokenProvider.CreateTimeoutTokenSource(60000); // 60 seconds timeout
                 using var linkedTokenSource = _cancellationTokenProvider.CreateLinkedTokenSource(
-                    cancellationToken, 
-                    timeoutTokenSource.Token, 
+                    cancellationToken,
+                    timeoutTokenSource.Token,
                     _cancellationTokenProvider.GetDefaultToken());
 
                 var combinedToken = linkedTokenSource.Token;
 
                 _logger.LogInformation("Updating note with id {Id} for user {UserId}", id, userId);
-                
+
                 // Check cancellation before validation
                 combinedToken.ThrowIfCancellationRequested();
-                
+
                 var validationResult = await _updateValidator.ValidateAsync(noteDto, combinedToken);
                 if (!validationResult.IsValid)
                 {
@@ -321,14 +321,14 @@ namespace NotesSolution.Application.Services
                     _logger.LogWarning("Note with id {Id} not found or not owned by user {UserId}", id, userId);
                     return (null, new List<string>(), true);
                 }
-                
+
                 // Check cancellation before tag processing
                 combinedToken.ThrowIfCancellationRequested();
                 var tagEntities = await _tagHelperService.GetOrCreateTagsAsync(noteDto.Tags, userId, combinedToken);
 
                 _mapper.Map(noteDto, existingNote);
                 existingNote.Tags = tagEntities;
-                
+
                 // Safely delete old images
                 if (existingNote.ImageUrls != null && existingNote.ImageUrls.Count > 0)
                 {
@@ -345,7 +345,7 @@ namespace NotesSolution.Application.Services
                     }
                     existingNote.ImageUrls.Clear();
                 }
-                
+
                 var imageHashes = new HashSet<string>();
                 if (images != null && images.Count > 0)
                 {
@@ -353,7 +353,7 @@ namespace NotesSolution.Application.Services
                     {
                         // Check cancellation before each image processing
                         combinedToken.ThrowIfCancellationRequested();
-                        
+
                         var hash = await _imageService.ComputeImageHashAsync(image, combinedToken);
                         if (!imageHashes.Contains(hash))
                         {
@@ -379,7 +379,7 @@ namespace NotesSolution.Application.Services
                 {
                     _logger.LogWarning(ex, "Failed to invalidate cache for note {Id}", id);
                 }
-                
+
                 _logger.LogInformation("Updated note with id {Id} for user {UserId}", id, userId);
                 return (_mapper.Map<NoteDto>(existingNote), new List<string>(), false);
             }
@@ -403,17 +403,17 @@ namespace NotesSolution.Application.Services
             {
                 using var timeoutTokenSource = _cancellationTokenProvider.CreateTimeoutTokenSource(30000); // 30 seconds timeout
                 using var linkedTokenSource = _cancellationTokenProvider.CreateLinkedTokenSource(
-                    cancellationToken, 
-                    timeoutTokenSource.Token, 
+                    cancellationToken,
+                    timeoutTokenSource.Token,
                     _cancellationTokenProvider.GetDefaultToken());
 
                 var combinedToken = linkedTokenSource.Token;
 
                 _logger.LogInformation("Deleting note with id {Id} for user {UserId}", id, userId);
-                
+
                 // Check cancellation before getting note
                 combinedToken.ThrowIfCancellationRequested();
-                
+
                 var existingNote = await GetUserNoteByIdAsync(userId, id, combinedToken);
                 if (existingNote == null)
                 {
@@ -422,7 +422,7 @@ namespace NotesSolution.Application.Services
                 }
 
                 var imageUrls = existingNote.ImageUrls?.ToList() ?? new List<string>();
-                
+
                 // Check cancellation before database operation
                 combinedToken.ThrowIfCancellationRequested();
                 await _noteRepository.RemoveAsync(existingNote, combinedToken);
@@ -437,7 +437,7 @@ namespace NotesSolution.Application.Services
                 {
                     _logger.LogWarning(ex, "Failed to invalidate cache for note {Id}", id);
                 }
-                
+
                 // Safely delete images after successful database operation
                 foreach (var imageUrl in imageUrls)
                 {
@@ -450,7 +450,7 @@ namespace NotesSolution.Application.Services
                         _logger.LogWarning(ex, "Failed to delete image {ImageUrl} for note {Id}", imageUrl, id);
                     }
                 }
-                
+
                 _logger.LogInformation("Note with id {Id} deleted for user {UserId}", id, userId);
                 return true;
             }
@@ -464,6 +464,6 @@ namespace NotesSolution.Application.Services
                 _logger.LogError(ex, "Error deleting note {Id} for user {UserId}", id, userId);
                 return false;
             }
-        }       
+        }
     }
-} 
+}

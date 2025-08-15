@@ -1,7 +1,7 @@
-using NotesSolution.Core.Models;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using NotesSolution.Core.Models;
 
 namespace NotesSolution.Core.Interfaces
 {
@@ -9,4 +9,4 @@ namespace NotesSolution.Core.Interfaces
     {
         Task<List<Tag>> GetOrCreateTagsAsync(List<string> tagNames, string userId, CancellationToken cancellationToken = default);
     }
-} 
+}

@@ -4,4 +4,4 @@ namespace NotesSolution.Application.Dtos
     {
         public string Name { get; set; } = string.Empty;
     }
-} 
+}

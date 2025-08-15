@@ -33,7 +33,7 @@ namespace NotesSolution.Tests.Services
             // Setup cancellation token provider
             var timeoutTokenSource = new CancellationTokenSource();
             var linkedTokenSource = new CancellationTokenSource();
-            
+
             _cancellationTokenProviderMock.Setup(p => p.GetDefaultToken())
                 .Returns(CancellationToken.None);
             _cancellationTokenProviderMock.Setup(p => p.CreateTimeoutTokenSource(It.IsAny<int>()))
@@ -72,7 +72,7 @@ namespace NotesSolution.Tests.Services
             var loginDto = new LoginRequestDto { UserName = "test", Password = "wrong" };
             _authRepositoryMock.Setup(r => r.Login(loginDto.UserName, loginDto.Password, It.IsAny<CancellationToken>()))
                 .ReturnsAsync((IdentityUser?)null);
-            
+
             // Act
             var result = await _authService.LoginAsync(loginDto, CancellationToken.None);
 
@@ -109,7 +109,7 @@ namespace NotesSolution.Tests.Services
             var user = new IdentityUser { UserName = "existing", Id = "3" };
             _authRepositoryMock.Setup(r => r.FindByNameAsync(regDto.UserName, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(user);
-            
+
             // Act
             var result = await _authService.RegisterAsync(regDto, CancellationToken.None);
 

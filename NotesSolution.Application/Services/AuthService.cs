@@ -1,14 +1,14 @@
-using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Tokens;
-using NotesSolution.Application.Dtos;
-using NotesSolution.Application.Interfaces;
-using NotesSolution.Core.Interfaces.IRepositories;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using System.Threading;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
+using NotesSolution.Application.Dtos;
+using NotesSolution.Application.Interfaces;
+using NotesSolution.Core.Interfaces.IRepositories;
 
 namespace NotesSolution.Application.Services
 {
@@ -21,8 +21,8 @@ namespace NotesSolution.Application.Services
         private readonly ICancellationTokenProvider _cancellationTokenProvider;
 
         public AuthService(
-            IAuthRepository authRepository, 
-            IConfiguration configuration, 
+            IAuthRepository authRepository,
+            IConfiguration configuration,
             IJwtService jwtService,
             ILogger<AuthService> logger,
             ICancellationTokenProvider cancellationTokenProvider)
@@ -40,17 +40,17 @@ namespace NotesSolution.Application.Services
             {
                 using var timeoutTokenSource = _cancellationTokenProvider.CreateTimeoutTokenSource(15000); // 15 seconds timeout
                 using var linkedTokenSource = _cancellationTokenProvider.CreateLinkedTokenSource(
-                    cancellationToken, 
-                    timeoutTokenSource.Token, 
+                    cancellationToken,
+                    timeoutTokenSource.Token,
                     _cancellationTokenProvider.GetDefaultToken());
 
                 var combinedToken = linkedTokenSource.Token;
 
                 _logger.LogInformation("Login attempt for user {UserName}", loginRequestDto.UserName);
-                
+
                 // Check cancellation before authentication
                 combinedToken.ThrowIfCancellationRequested();
-                
+
                 var user = await _authRepository.Login(loginRequestDto.UserName, loginRequestDto.Password, combinedToken);
                 if (user == null)
                 {
@@ -93,17 +93,17 @@ namespace NotesSolution.Application.Services
             {
                 using var timeoutTokenSource = _cancellationTokenProvider.CreateTimeoutTokenSource(15000); // 15 seconds timeout
                 using var linkedTokenSource = _cancellationTokenProvider.CreateLinkedTokenSource(
-                    cancellationToken, 
-                    timeoutTokenSource.Token, 
+                    cancellationToken,
+                    timeoutTokenSource.Token,
                     _cancellationTokenProvider.GetDefaultToken());
 
                 var combinedToken = linkedTokenSource.Token;
 
                 _logger.LogInformation("Registration attempt for user {UserName}", requestDto.UserName);
-                
+
                 // Check cancellation before checking existing user
                 combinedToken.ThrowIfCancellationRequested();
-                
+
                 var existingUser = await _authRepository.FindByNameAsync(requestDto.UserName, combinedToken);
                 if (existingUser != null)
                 {
@@ -113,7 +113,7 @@ namespace NotesSolution.Application.Services
 
                 // Check cancellation before registration
                 combinedToken.ThrowIfCancellationRequested();
-                
+
                 var user = await _authRepository.Register(requestDto.UserName, requestDto.Password, combinedToken);
                 if (user == null)
                 {
@@ -137,4 +137,4 @@ namespace NotesSolution.Application.Services
             }
         }
     }
-} 
+}

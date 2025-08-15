@@ -1,9 +1,9 @@
+using System.Threading;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using NotesSolution.Core.Interfaces.IRepositories;
 using NotesSolution.Core.Models;
 using NotesSolution.Infrastructure.Data;
-using System.Threading;
-using Microsoft.Extensions.Logging;
 
 namespace NotesSolution.Infrastructure.Repositories
 {
@@ -23,11 +23,11 @@ namespace NotesSolution.Infrastructure.Repositories
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 _logger.LogDebug("Getting all tags for user {UserId}", userId);
-                
+
                 var result = await _db.Tags.Where(t => t.UserId == userId).ToListAsync(cancellationToken);
-                
+
                 _logger.LogDebug("Retrieved {Count} tags for user {UserId}", result.Count, userId);
                 return result;
             }
@@ -48,11 +48,11 @@ namespace NotesSolution.Infrastructure.Repositories
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 _logger.LogDebug("Getting tag {Id} for user {UserId}", id, userId);
-                
+
                 var result = await _db.Tags.FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId, cancellationToken);
-                
+
                 if (result != null)
                 {
                     _logger.LogDebug("Found tag {Id} for user {UserId}", id, userId);
@@ -61,7 +61,7 @@ namespace NotesSolution.Infrastructure.Repositories
                 {
                     _logger.LogDebug("Tag {Id} not found for user {UserId}", id, userId);
                 }
-                
+
                 return result;
             }
             catch (OperationCanceledException)
@@ -81,11 +81,11 @@ namespace NotesSolution.Infrastructure.Repositories
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 _logger.LogDebug("Getting tag by name {Name} for user {UserId}", name, userId);
-                
+
                 var result = await _db.Tags.FirstOrDefaultAsync(t => t.Name.ToLower() == name.ToLower() && t.UserId == userId, cancellationToken);
-                
+
                 if (result != null)
                 {
                     _logger.LogDebug("Found tag {Name} for user {UserId}", name, userId);
@@ -94,7 +94,7 @@ namespace NotesSolution.Infrastructure.Repositories
                 {
                     _logger.LogDebug("Tag {Name} not found for user {UserId}", name, userId);
                 }
-                
+
                 return result;
             }
             catch (OperationCanceledException)
@@ -114,12 +114,12 @@ namespace NotesSolution.Infrastructure.Repositories
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 _logger.LogDebug("Creating tag {Id} with name {Name} for user {UserId}", tag.Id, tag.Name, tag.UserId);
-                
+
                 await _db.Tags.AddAsync(tag, cancellationToken);
                 await SaveAsync(cancellationToken);
-                
+
                 _logger.LogDebug("Successfully created tag {Id} with name {Name} for user {UserId}", tag.Id, tag.Name, tag.UserId);
             }
             catch (OperationCanceledException)
@@ -139,12 +139,12 @@ namespace NotesSolution.Infrastructure.Repositories
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 _logger.LogDebug("Updating tag {Id} with name {Name} for user {UserId}", tag.Id, tag.Name, tag.UserId);
-                
+
                 _db.Tags.Update(tag);
                 await SaveAsync(cancellationToken);
-                
+
                 _logger.LogDebug("Successfully updated tag {Id} with name {Name} for user {UserId}", tag.Id, tag.Name, tag.UserId);
             }
             catch (OperationCanceledException)
@@ -164,9 +164,9 @@ namespace NotesSolution.Infrastructure.Repositories
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 _logger.LogDebug("Removing tag {Id} with name {Name} for user {UserId}", tag.Id, tag.Name, tag.UserId);
-                
+
                 var tracked = await _db.Tags.FindAsync(new object[] { tag.Id }, cancellationToken);
                 if (tracked != null)
                 {
@@ -210,4 +210,4 @@ namespace NotesSolution.Infrastructure.Repositories
             }
         }
     }
-} 
+}
