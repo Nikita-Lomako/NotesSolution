@@ -13,7 +13,7 @@ WORKDIR /src
 COPY ["NotesSolution.API/NotesSolution.API.csproj", "NotesSolution.API/"]
 COPY ["NotesSolution.Infrastructure/NotesSolution.Infrastructure.csproj", "NotesSolution.Infrastructure/"]
 COPY ["NotesSolution.Core/NotesSolution.Core.csproj", "NotesSolution.Core/"]
-COPY ["NotesSolution.Core/NotesSolution.Application.csproj", "NotesSolution.Application/"]
+COPY ["NotesSolution.Application/NotesSolution.Application.csproj", "NotesSolution.Application/"]
 RUN dotnet restore "./NotesSolution.API/NotesSolution.API.csproj"
 COPY . .
 WORKDIR "/src/NotesSolution.API"
